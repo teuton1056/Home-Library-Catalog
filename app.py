@@ -661,6 +661,7 @@ def _sync_author_field(db, entry_id):
 
 def _commit(db):
     """Commit and flag that a backup should be made after the request."""
+    logger.debug('Committing database changes...')
     db.commit()
     if has_request_context():
         g._db_modified = True
