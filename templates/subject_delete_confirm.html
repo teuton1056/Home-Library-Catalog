@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block title %}Delete Subject Heading — Home Library Catalog{% endblock %}
+
+{% block content %}
+<div class="confirm-page">
+  <h1>Delete Subject Heading</h1>
+  <p>You are about to delete the heading <strong>{{ heading.heading }}</strong>.</p>
+
+  {% if entry_count %}
+  <p class="confirm-warning">
+    This heading is currently assigned to <strong>{{ entry_count }} {{ 'entry' if entry_count == 1 else 'entries' }}</strong>.
+    Deleting it will remove the tag from all of those entries.
+  </p>
+  {% else %}
+  <p>This heading is not assigned to any entries.</p>
+  {% endif %}
+
+  <form method="post" class="confirm-actions">
+    <button type="submit" name="confirm" value="unlink" class="btn btn-danger">
+      Delete{% if entry_count %} and unlink {{ entry_count }} {{ 'entry' if entry_count == 1 else 'entries' }}{% endif %}
+    </button>
+    <a href="{{ url_for('subject_detail', heading_id=heading.id) }}" class="btn btn-secondary">Cancel</a>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,155 @@
+{% extends 'base.html' %}
+{% block title %}Library Management — Home Library Catalog{% endblock %}
+
+{% block content %}
+<h1>Library Management</h1>
+
+<div class="manage-actions">
+  {% if current_patron and current_patron.role == 'owner' %}
+  <a href="{{ url_for('new_library') }}" class="btn btn-primary">+ New Library</a>
+  {% endif %}
+  <a href="{{ url_for('import_librarything') }}" class="btn btn-secondary">&#8659; Import LibraryThing</a>
+  <a href="{{ url_for('export_csv') }}" class="btn btn-secondary">&#8593; Export CSV</a>
+  <a href="{{ url_for('audit') }}" class="btn btn-secondary">&#10003; Audit</a>
+  <a href="{{ url_for('barcode_check') }}" class="btn btn-secondary">&#128690; Check Barcodes</a>
+</div>
+
+<div class="barcode-info">
+  <span class="barcode-info-item">
+    <span class="barcode-info-label">Next unused barcode</span>
+    <span class="barcode-info-num">{{ '%05d' % next_unused }}</span>
+  </span>
+  <span class="barcode-info-sep"></span>
+  <span class="barcode-info-item">
+    <span class="barcode-info-label">Next highest barcode</span>
+    <span class="barcode-info-num">{{ '%05d' % next_highest }}</span>
+  </span>
+</div>
+
+<!-- Patrons -->
+<div class="section-header">
+  <h2>Patrons</h2>
+</div>
+
+{% if patrons %}
+<table class="vol-table manage-table">
+  <thead>
+    <tr>
+      <th>No.</th>
+      <th>Name</th>
+      <th>Role</th>
+      <th>Email</th>
+      <th><span class="visually-hidden">Actions</span></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for patron in patrons %}
+    <tr>
+      <td class="vol-id-cell">{{ patron.patron_number }}</td>
+      <td>{{ patron.name }}</td>
+      <td><span class="patron-role-badge patron-role-{{ patron.role }}">{{ patron_role_labels.get(patron.role, patron.role) }}</span></td>
+      <td>{{ patron.email or '—' }}</td>
+      <td class="vol-actions">
+        {% if current_patron and current_patron.role == 'owner' %}
+        <form method="post"
+              action="{{ url_for('delete_patron', patron_id=patron.id) }}"
+              class="delete-form"
+              onsubmit="return confirm('Delete patron {{ patron.patron_number }} — {{ patron.name }}?')">
+          <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+        </form>
+        <form method="post"
+              action="{{ url_for('set_patron_password', patron_id=patron.id) }}"
+              class="reset-pw-form">
+          <input name="password" type="text" placeholder="New password"
+                 class="input-sm" style="width:110px" required minlength="4">
+          <button type="submit" class="btn btn-secondary btn-sm">Set Password</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty-state">No patrons yet.</p>
+{% endif %}
+
+{% if current_patron and current_patron.role == 'owner' %}
+<details class="add-volume-details">
+  <summary>Add a patron</summary>
+  <form method="post" action="{{ url_for('add_patron') }}" class="inline-form">
+    <div class="form-group">
+      <label>Name <span class="required">*</span></label>
+      <input name="name" type="text" placeholder="Full name" required>
+    </div>
+    <div class="form-group">
+      <label>Role</label>
+      <select name="role">
+        {% for role_key, role_label in patron_roles %}
+        <option value="{{ role_key }}">{{ role_label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Email</label>
+      <input name="email" type="email" placeholder="optional">
+    </div>
+    <div class="form-group">
+      <label>Password <span class="required">*</span></label>
+      <input name="password" type="text" placeholder="Initial password" required minlength="4">
+    </div>
+    <div class="form-group form-group-btn">
+      <label>&nbsp;</label>
+      <button type="submit" class="btn btn-primary">Add</button>
+    </div>
+  </form>
+</details>
+{% endif %}
+
+<!-- Libraries -->
+<div class="section-header">
+  <h2>Libraries</h2>
+</div>
+
+{% if libraries %}
+<table class="vol-table manage-table">
+  <thead>
+    <tr>
+      <th>Library</th>
+      <th>Type</th>
+      <th>Entries</th>
+      <th><span class="visually-hidden">Actions</span></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for lib in libraries %}
+    <tr>
+      <td>
+        <a href="{{ url_for('library', library_id=lib.id) }}">{{ lib.name }}</a>
+      </td>
+      <td>
+        {% if lib.is_primary %}<span class="lib-badge lib-badge-primary">Primary</span>{% endif %}
+        {% if lib.is_storage %}<span class="lib-badge lib-badge-storage">Storage</span>{% endif %}
+        {% if not lib.is_primary and not lib.is_storage %}<span class="text-muted">—</span>{% endif %}
+      </td>
+      <td>{{ lib.entry_count }}</td>
+      <td class="vol-actions">
+        {% if current_patron and current_patron.role == 'owner' %}
+        <a href="{{ url_for('library', library_id=lib.id) }}?settings=1"
+           class="btn btn-secondary btn-sm">Settings</a>
+        <form method="post"
+              action="{{ url_for('delete_library', library_id=lib.id) }}"
+              class="delete-form"
+              onsubmit="return confirm('Delete {{ lib.name }} and remove it from all volumes?')">
+          <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty-state">No libraries yet. Create one to start cataloguing your collection.</p>
+{% endif %}
+{% endblock %}

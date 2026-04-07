@@ -1,0 +1,150 @@
+{% extends 'base.html' %}
+{% block title %}{{ library.name }} — Home Library Catalog{% endblock %}
+
+{% block content %}
+{% set can_edit = current_patron and current_patron.role in ('owner', 'cataloguer') %}
+<div class="breadcrumb">
+  <a href="{{ url_for('index', all=1) }}">Libraries</a> &rsaquo; {{ library.name }}
+</div>
+
+<div class="page-header">
+  <div>
+    <h1>
+      {{ library.name }}
+      {% if library.is_primary %}<span class="lib-badge lib-badge-primary">Primary</span>{% endif %}
+      {% if library.is_storage %}<span class="lib-badge lib-badge-storage">Storage</span>{% endif %}
+    </h1>
+  </div>
+  {% if can_edit %}
+  <div class="page-actions">
+    <a href="{{ url_for('new_entry') }}?library_id={{ library.id }}"
+       class="btn btn-primary">+ Add Entry</a>
+    {% if current_patron.role == 'owner' %}
+    <button type="button" class="btn btn-secondary btn-sm"
+            onclick="document.getElementById('lib-settings').hidden = !document.getElementById('lib-settings').hidden">
+      Settings
+    </button>
+    <form method="post"
+          action="{{ url_for('delete_library', library_id=library.id) }}"
+          class="delete-form"
+          onsubmit="return confirm('Delete this library and remove it from all volumes?')">
+      <button type="submit" class="btn btn-danger btn-sm">Delete Library</button>
+    </form>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{% if current_patron and current_patron.role == 'owner' %}
+<div id="lib-settings" class="card lib-settings-card" hidden>
+  <h3>Library Settings</h3>
+  <form method="post" action="{{ url_for('edit_library', library_id=library.id) }}">
+    <div class="form-group">
+      <label for="lib-name">Name</label>
+      <input id="lib-name" name="name" type="text" value="{{ library.name }}">
+    </div>
+    <div class="form-group">
+      <label class="checkbox-label">
+        <input type="checkbox" name="is_primary" value="1"
+               {{ 'checked' if library.is_primary else '' }}>
+        Primary library
+      </label>
+      <span class="field-hint">Replaces any currently set primary library.</span>
+    </div>
+    <div class="form-group">
+      <label class="checkbox-label">
+        <input type="checkbox" name="is_storage" value="1"
+               {{ 'checked' if library.is_storage else '' }}>
+        Storage location
+      </label>
+    </div>
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary btn-sm">Save</button>
+    </div>
+  </form>
+</div>
+{% endif %}
+
+{% if entries %}
+  <div class="sort-bar">
+    <span class="sort-bar-label">Sort:</span>
+    {% for key, label in sort_options %}
+      <a href="?sort={{ key }}{% if request.args.get('settings') %}&settings=1{% endif %}"
+         class="sort-bar-btn{% if sort == key %} active{% endif %}">{{ label }}</a>
+    {% endfor %}
+  </div>
+
+  {% if sort == 'title' %}
+    {# Default view: grouped by type #}
+    {% for type_key, type_entries in entries | groupby('type') %}
+    <div class="type-section">
+      <div class="type-section-header">{{ type_labels.get(type_key, type_key) }}</div>
+      <ul class="entry-list">
+        {% for entry in type_entries %}
+        <li class="entry-item">
+          <a class="entry-title" href="{{ url_for('entry_detail', entry_id=entry.id) }}">
+            {{ entry.title or '(Untitled)' }}
+          </a>
+          {% if entry.author %}<span class="entry-meta">{{ entry.author }}</span>{% endif %}
+          {% if entry.year %}<span class="entry-meta">{{ entry.year }}</span>{% endif %}
+          <span class="entry-meta shelfmark-display">
+            &mdash;
+            {% if entry.volume_count == 0 and entry.digital_count %}
+              <span class="digital-only-badge">Digital Resource Only</span>
+            {% elif entry.volume_count == 0 %}
+              <span class="no-shelfmark">No Call Number Recorded</span>
+            {% elif entry.first_call_number %}{{ entry.first_call_number }}
+            {% else %}&mdash;{% endif %}
+          </span>
+          <span class="vol-count">
+            {{ entry.volume_count }} {{ 'vol.' if entry.volume_count == 1 else 'vols.' }}
+            {% if entry.digital_count %}&middot; {{ entry.digital_count }} digital{% endif %}
+          </span>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endfor %}
+  {% else %}
+    {# Flat list for author/year/locus sorts #}
+    <ul class="entry-list">
+      {% for entry in entries %}
+      <li class="entry-item">
+        <div class="entry-title-block">
+          <a class="entry-title" href="{{ url_for('entry_detail', entry_id=entry.id) }}">
+            {{ entry.title or '(Untitled)' }}
+          </a>
+          <span class="type-badge">{{ type_labels.get(entry.type, entry.type) }}</span>
+        </div>
+        <div class="entry-meta-block">
+          {% if entry.author %}<span class="entry-meta">{{ entry.author }}</span>{% endif %}
+          {% if entry.year %}<span class="entry-meta">{{ entry.year }}</span>{% endif %}
+          <span class="entry-meta shelfmark-display">
+            &mdash;
+            {% if entry.volume_count == 0 and entry.digital_count %}
+              <span class="digital-only-badge">Digital Resource Only</span>
+            {% elif entry.volume_count == 0 %}
+              <span class="no-shelfmark">No Call Number Recorded</span>
+            {% elif entry.first_call_number %}{{ entry.first_call_number }}
+            {% else %}&mdash;{% endif %}
+          </span>
+          <span class="vol-count">
+            {{ entry.volume_count }} {{ 'vol.' if entry.volume_count == 1 else 'vols.' }}
+            {% if entry.digital_count %}&middot; {{ entry.digital_count }} digital{% endif %}
+          </span>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+{% else %}
+  <p class="empty-state">
+    No entries yet.
+    {% if can_edit %}<a href="{{ url_for('new_entry') }}?library_id={{ library.id }}">Add the first one.</a>{% endif %}
+  </p>
+{% endif %}
+
+{% if open_settings and current_patron and current_patron.role == 'owner' %}
+<script>document.getElementById('lib-settings').hidden = false;</script>
+{% endif %}
+{% endblock %}

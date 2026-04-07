@@ -1,0 +1,167 @@
+{% extends 'base.html' %}
+{% block title %}Auditing {{ library.name }} — Home Library Catalog{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+  <a href="{{ url_for('manage') }}">Library Management</a> &rsaquo;
+  <a href="{{ url_for('audit') }}">Audit</a> &rsaquo;
+  {{ library.name }}
+</div>
+
+<div class="audit-header">
+  <div>
+    <h1>Auditing: {{ library.name }}</h1>
+    <p class="audit-intro">Scan each barcode to mark the volume as present. The audit ends automatically when all items are confirmed.</p>
+  </div>
+  <form method="post" action="{{ url_for('audit_stop', library_id=library.id) }}" class="delete-form">
+    <button type="submit" class="btn btn-danger"
+            onclick="return confirm('Stop the audit now? A list of unscanned volumes will be shown.')">
+      Stop Audit
+    </button>
+  </form>
+</div>
+
+<!-- Progress -->
+<div class="audit-progress-wrap">
+  <div class="audit-progress-bar-track">
+    <div class="audit-progress-bar" id="progress-bar"
+         style="width: {{ (scanned / total * 100) | round(1) if total else 0 }}%"></div>
+  </div>
+  <span class="audit-progress-label" id="progress-label">
+    {{ scanned }} / {{ total }} scanned
+  </span>
+</div>
+
+{% if no_barcode %}
+<p class="audit-warn">
+  &#9888; {{ no_barcode }} volume{{ 's' if no_barcode != 1 else '' }} in this library
+  {{ 'have' if no_barcode != 1 else 'has' }} no barcode and cannot be scanned — check manually.
+</p>
+{% endif %}
+
+<!-- Scan input -->
+<div class="audit-scan-box">
+  <label class="audit-scan-label" for="barcode-input">Scan barcode</label>
+  <input id="barcode-input" type="text" class="barcode-input audit-barcode-input"
+         autocomplete="off" autofocus placeholder="waiting for scan…">
+</div>
+
+<!-- Feedback area -->
+<div id="scan-feedback" class="audit-feedback" hidden>
+  <div id="scan-ok" class="audit-result">
+    <span class="audit-result-icon">&#10003;</span>
+    <div class="audit-result-detail">
+      <strong id="result-title"></strong>
+      <span id="result-author" class="audit-result-meta"></span>
+      <span id="result-volnum" class="audit-result-meta"></span>
+    </div>
+  </div>
+  <div id="scan-warn" class="audit-result audit-result-warn">
+    <span class="audit-result-icon">&#8635;</span>
+    <div class="audit-result-detail">
+      <strong id="result-warn-msg"></strong>
+    </div>
+  </div>
+  <div id="scan-error" class="audit-result audit-result-error">
+    <span class="audit-result-icon">&#10005;</span>
+    <div class="audit-result-detail">
+      <strong id="result-error-msg"></strong>
+      <span class="audit-result-meta">Set this item aside for manual checking.</span>
+    </div>
+  </div>
+</div>
+
+<!-- Complete overlay -->
+<div id="audit-complete" class="audit-complete">
+  <div class="audit-complete-inner">
+    <div class="audit-complete-icon">&#10003;</div>
+    <h2>Audit Complete</h2>
+    <p>All <strong id="complete-total"></strong> barcoded volumes in <em>{{ library.name }}</em> have been confirmed present.</p>
+    <a href="{{ url_for('audit_results', library_id=library.id) }}" class="btn btn-primary">View Results</a>
+    <a href="{{ url_for('audit') }}" class="btn btn-secondary">New Audit</a>
+  </div>
+</div>
+
+<script>
+const SCAN_URL  = "{{ url_for('audit_scan', library_id=library.id) }}";
+const STOP_URL  = "{{ url_for('audit_stop', library_id=library.id) }}";
+const input     = document.getElementById('barcode-input');
+const feedback  = document.getElementById('scan-feedback');
+const okBox     = document.getElementById('scan-ok');
+const warnBox   = document.getElementById('scan-warn');
+const errorBox  = document.getElementById('scan-error');
+const progBar   = document.getElementById('progress-bar');
+const progLabel = document.getElementById('progress-label');
+const complete  = document.getElementById('audit-complete');
+
+function showOnly(el) {
+  [okBox, warnBox, errorBox].forEach(b => b.classList.remove('visible'));
+  if (el) el.classList.add('visible');
+  feedback.hidden = false;
+}
+
+function updateProgress(scanned, total) {
+  const pct = total > 0 ? (scanned / total * 100).toFixed(1) : 0;
+  progBar.style.width = pct + '%';
+  progLabel.textContent = scanned + ' / ' + total + ' scanned';
+}
+
+input.addEventListener('keydown', function(e) {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  const barcode = input.value.trim();
+  input.value = '';
+  if (!barcode) return;
+
+  fetch(SCAN_URL, {
+    method:  'POST',
+    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+    body:    'barcode=' + encodeURIComponent(barcode),
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (!data.found) {
+      document.getElementById('result-error-msg').textContent = data.error || 'Barcode not found.';
+      showOnly(errorBox);
+      return;
+    }
+
+    updateProgress(data.scanned, data.total);
+
+    if (data.already_scanned) {
+      document.getElementById('result-warn-msg').textContent =
+        '"' + data.entry.title + '" was already scanned.';
+      showOnly(warnBox);
+    } else {
+      document.getElementById('result-title').textContent  = data.entry.title;
+      document.getElementById('result-author').textContent = data.entry.author;
+      const vn = data.entry.volume_number;
+      const vnEl = document.getElementById('result-volnum');
+      vnEl.textContent = vn ? ('Vol. ' + vn) : '';
+      vnEl.hidden = !vn;
+      showOnly(okBox);
+    }
+
+    if (data.complete) {
+      document.getElementById('complete-total').textContent = data.total;
+      complete.classList.add('visible');
+      input.disabled = true;
+    }
+  })
+  .catch(() => {
+    document.getElementById('result-error-msg').textContent = 'Network error — try again.';
+    showOnly(errorBox);
+  })
+  .finally(() => {
+    if (!input.disabled) input.focus();
+  });
+});
+
+// Keep focus on input whenever the page is clicked
+document.addEventListener('click', function(e) {
+  if (!input.disabled && !e.target.closest('a') && !e.target.closest('button')) {
+    input.focus();
+  }
+});
+</script>
+{% endblock %}

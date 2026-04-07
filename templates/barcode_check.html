@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+{% block title %}Barcode Check — Home Library Catalog{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Barcode Check</h1>
+  <a href="{{ url_for('manage') }}" class="btn btn-secondary btn-sm">&#8592; Back to Manage</a>
+</div>
+
+{% if duplicates %}
+<div class="flash flash-warning">
+  {{ duplicates | length }} duplicate barcode{{ 's' if duplicates | length != 1 else '' }} found —
+  each barcode below is assigned to more than one volume.
+</div>
+
+{% for dup in duplicates %}
+<div class="dup-group">
+  <div class="dup-barcode">{{ dup.barcode }}</div>
+  <table class="vol-table">
+    <thead>
+      <tr>
+        <th>Volume ID</th>
+        <th>Title</th>
+        <th>Author</th>
+        <th>Year</th>
+        <th>Vol. No.</th>
+        <th>Library</th>
+        <th><span class="visually-hidden">Actions</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for vol in dup.volumes %}
+      <tr>
+        <td class="text-muted vol-id-cell">{{ vol.volume_id }}</td>
+        <td><a href="{{ url_for('entry_detail', entry_id=vol.entry_id) }}">{{ vol.title or '(Untitled)' }}</a></td>
+        <td>{{ vol.author or '—' }}</td>
+        <td>{{ vol.year or '—' }}</td>
+        <td>{{ vol.volume_number or '—' }}</td>
+        <td>{{ vol.library_name or '—' }}</td>
+        <td class="vol-actions">
+          <a href="{{ url_for('entry_detail', entry_id=vol.entry_id) }}"
+             class="btn btn-secondary btn-sm">View</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endfor %}
+{% endif %}
+
+{% if unbarcoded %}
+<h2 class="barcode-check-section-heading">Volumes without a barcode</h2>
+<div class="flash flash-warning">
+  {{ unbarcoded | length }} volume{{ 's' if unbarcoded | length != 1 else '' }} without a barcode.
+</div>
+<table class="vol-table">
+  <thead>
+    <tr>
+      <th>Volume ID</th>
+      <th>Title</th>
+      <th>Author</th>
+      <th>Year</th>
+      <th>Vol. No.</th>
+      <th>Library</th>
+      <th><span class="visually-hidden">Actions</span></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for vol in unbarcoded %}
+    <tr>
+      <td class="text-muted vol-id-cell">{{ vol.volume_id }}</td>
+      <td><a href="{{ url_for('entry_detail', entry_id=vol.entry_id) }}">{{ vol.title or '(Untitled)' }}</a></td>
+      <td>{{ vol.author or '—' }}</td>
+      <td>{{ vol.year or '—' }}</td>
+      <td>{{ vol.volume_number or '—' }}</td>
+      <td>{{ vol.library_name or '—' }}</td>
+      <td class="vol-actions">
+        <a href="{{ url_for('entry_detail', entry_id=vol.entry_id) }}"
+           class="btn btn-secondary btn-sm">View</a>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+{% endblock %}

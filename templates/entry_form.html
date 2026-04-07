@@ -1,0 +1,421 @@
+{% extends 'base.html' %}
+{% set page_title = 'Edit Entry' if editing else 'New Entry' %}
+{% block title %}{{ page_title }} — Home Library Catalog{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+  {% if editing %}
+    <a href="{{ url_for('index') }}">Libraries</a>
+    &rsaquo; <a href="{{ url_for('entry_detail', entry_id=entry.id) }}">
+      {{ entry.title or '(Untitled)' }}
+    </a> &rsaquo; Edit
+  {% else %}
+    <a href="{{ url_for('index') }}">Libraries</a> &rsaquo; New Entry
+  {% endif %}
+</div>
+
+<h1>{{ page_title }}</h1>
+
+<div class="form-card">
+  <form method="post">
+
+    <input type="hidden" name="hint_library_id" value="{{ hint_library_id or '' }}">
+
+    <div class="form-group">
+      <label for="type">Type <span class="required">*</span></label>
+      <select id="type" name="type" required>
+        <option value="">— select —</option>
+        {% for type_key, type_label in entry_types %}
+        <option value="{{ type_key }}"
+          {{ 'selected' if editing and entry.type == type_key else '' }}>
+          {{ type_label }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label for="title">Title</label>
+      <input id="title" name="title" type="text"
+             value="{{ entry.title if editing and entry.title else '' }}">
+    </div>
+
+    <div class="form-group">
+      <label for="subtitle">Subtitle</label>
+      <input id="subtitle" name="subtitle" type="text"
+             value="{{ entry.subtitle if editing and entry.subtitle else '' }}">
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="year">Year</label>
+        <input id="year" name="year" type="text"
+               placeholder="e.g. 1984 or 1990-1993"
+               value="{{ entry.year if editing and entry.year else '' }}">
+      </div>
+
+      <div class="form-group">
+        <label for="language">Language</label>
+        <input id="language" name="language" type="text"
+               placeholder="e.g. English"
+               value="{{ entry.language if editing and entry.language else '' }}">
+      </div>
+    </div>
+
+    <div class="form-group" id="publication-group">
+      <label for="publication">Publication</label>
+      <input id="publication" name="publication" type="text"
+             placeholder="Journal name"
+             value="{{ entry.publication if editing and entry.publication else '' }}">
+    </div>
+
+    <div class="form-row" id="pub-vol-issue-row">
+      <div class="form-group">
+        <label for="pub_volume">Volume</label>
+        <input id="pub_volume" name="pub_volume" type="text"
+               placeholder="e.g. 12"
+               value="{{ entry.pub_volume if editing and entry.pub_volume else '' }}">
+      </div>
+      <div class="form-group">
+        <label for="pub_issue">Issue</label>
+        <input id="pub_issue" name="pub_issue" type="text"
+               placeholder="e.g. 3"
+               value="{{ entry.pub_issue if editing and entry.pub_issue else '' }}">
+      </div>
+    </div>
+
+    <div class="form-group" id="book-title-group">
+      <label for="book_title">Book Title</label>
+      <input id="book_title" name="book_title" type="text"
+             placeholder="Title of the containing book"
+             value="{{ entry.book_title if editing and entry.book_title else '' }}">
+    </div>
+
+    <div class="form-group" id="pages-group">
+      <label for="pages">Pages</label>
+      <input id="pages" name="pages" type="text"
+             placeholder="e.g. 45–67"
+             value="{{ entry.pages if editing and entry.pages else '' }}">
+    </div>
+
+    <div class="form-group" id="publisher-group">
+      <label for="publisher">Publisher</label>
+      <input id="publisher" name="publisher" type="text"
+             value="{{ entry.publisher if editing and entry.publisher else '' }}">
+    </div>
+
+    <div class="form-group" id="pub-location-group">
+      <label for="publisher_location">Publisher Location</label>
+      <input id="publisher_location" name="publisher_location" type="text"
+             placeholder="City, Country"
+             value="{{ entry.publisher_location if editing and entry.publisher_location else '' }}">
+    </div>
+
+    <div class="form-group">
+      <label>Subject Headings</label>
+      <div class="tag-input-container" id="subject-tag-container">
+        {% if editing and subject_headings %}
+          {% for sh in subject_headings %}
+          <span class="tag-chip" data-value="{{ sh.heading }}">
+            {{ sh.heading }}<button type="button" class="tag-chip-remove" aria-label="Remove">&times;</button>
+          </span>
+          {% endfor %}
+        {% endif %}
+        <div class="tag-input-wrapper">
+          <input id="subject-input" type="text" class="tag-text-input"
+                 autocomplete="off" placeholder="Add a subject heading…">
+          <ul class="subject-autocomplete" id="subject-ac-list" hidden></ul>
+        </div>
+      </div>
+      <input type="hidden" name="subject" id="subject-hidden"
+             value="{{ subject_headings | map(attribute='heading') | join(',') if editing and subject_headings else '' }}">
+      <span class="field-hint">Type to search existing headings. New headings will be created on save.</span>
+    </div>
+    <script>
+    (function () {
+      const container = document.getElementById('subject-tag-container');
+      const input     = document.getElementById('subject-input');
+      const acList    = document.getElementById('subject-ac-list');
+      const hidden    = document.getElementById('subject-hidden');
+
+      function getTags() {
+        return Array.from(container.querySelectorAll('.tag-chip'))
+                    .map(c => c.dataset.value);
+      }
+
+      function syncHidden() { hidden.value = getTags().join(','); }
+
+      function addTag(value) {
+        value = value.trim();
+        if (!value || getTags().includes(value)) { input.value = ''; hideAc(); return; }
+        const chip = document.createElement('span');
+        chip.className     = 'tag-chip';
+        chip.dataset.value = value;
+        chip.innerHTML     = value + '<button type="button" class="tag-chip-remove" aria-label="Remove">&times;</button>';
+        chip.querySelector('.tag-chip-remove').addEventListener('click', function () {
+          chip.remove(); syncHidden();
+        });
+        container.insertBefore(chip, container.querySelector('.tag-input-wrapper'));
+        input.value = '';
+        syncHidden();
+        hideAc();
+      }
+
+      container.querySelectorAll('.tag-chip-remove').forEach(function (btn) {
+        btn.addEventListener('click', function () { btn.closest('.tag-chip').remove(); syncHidden(); });
+      });
+
+      function hideAc() { acList.hidden = true; acList.innerHTML = ''; }
+
+      let acTimer = null;
+      input.addEventListener('input', function () {
+        clearTimeout(acTimer);
+        const q = input.value.trim();
+        if (!q) { hideAc(); return; }
+        acTimer = setTimeout(function () {
+          fetch('/api/subjects?q=' + encodeURIComponent(q))
+            .then(r => r.json())
+            .then(function (data) {
+              acList.innerHTML = '';
+              const existing = getTags();
+              data.forEach(function (item) {
+                if (existing.includes(item.heading)) return;
+                const li = document.createElement('li');
+                li.className = 'subject-ac-item';
+                let html = item.heading;
+                if (item.preferred) html += ' <span class="ac-redirect-note">\u2192 ' + item.preferred + '</span>';
+                li.innerHTML = html;
+                li.addEventListener('mousedown', function (e) {
+                  e.preventDefault();
+                  const finalValue = item.preferred || item.heading;
+                  addTag(finalValue);
+                  if (item.preferred) {
+                    const note = document.createElement('span');
+                    note.className   = 'tag-redirect-flash';
+                    note.textContent = '\u201c' + item.heading + '\u201d \u2192 \u201c' + item.preferred + '\u201d';
+                    container.parentNode.insertBefore(note, container.nextSibling);
+                    setTimeout(() => note.remove(), 3500);
+                  }
+                });
+                acList.appendChild(li);
+              });
+              const exactMatch = data.some(d => d.heading.toLowerCase() === q.toLowerCase());
+              if (!exactMatch && !existing.includes(q)) {
+                const li = document.createElement('li');
+                li.className = 'subject-ac-item subject-ac-new';
+                li.textContent = 'Create \u201c' + q + '\u201d';
+                li.addEventListener('mousedown', function (e) { e.preventDefault(); addTag(q); });
+                acList.appendChild(li);
+              }
+              acList.hidden = acList.children.length === 0;
+            })
+            .catch(function () { hideAc(); });
+        }, 180);
+      });
+
+      input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const hi = acList.querySelector('.subject-ac-item.highlighted');
+          if (hi) hi.dispatchEvent(new MouseEvent('mousedown'));
+          else if (input.value.trim()) addTag(input.value.trim());
+        } else if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          const items = Array.from(acList.querySelectorAll('.subject-ac-item'));
+          const idx   = items.findIndex(i => i.classList.contains('highlighted'));
+          items.forEach(i => i.classList.remove('highlighted'));
+          if (idx < items.length - 1) items[idx + 1].classList.add('highlighted');
+          else if (items.length) items[0].classList.add('highlighted');
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          const items = Array.from(acList.querySelectorAll('.subject-ac-item'));
+          const idx   = items.findIndex(i => i.classList.contains('highlighted'));
+          items.forEach(i => i.classList.remove('highlighted'));
+          if (idx > 0) items[idx - 1].classList.add('highlighted');
+          else if (items.length) items[items.length - 1].classList.add('highlighted');
+        } else if (e.key === 'Escape') { hideAc(); }
+      });
+
+      input.addEventListener('blur', function () { setTimeout(hideAc, 150); });
+    })();
+    </script>
+
+    <div class="form-group" id="series-group">
+      <label for="series">Series</label>
+      <input id="series" name="series" type="text"
+             placeholder="e.g. Oxford World's Classics"
+             value="{{ entry.series if editing and entry.series else '' }}">
+    </div>
+
+    <div class="form-row">
+      <div class="form-group" id="isbn-group">
+        <label for="isbn">ISBN</label>
+        <input id="isbn" name="isbn" type="text"
+               placeholder="e.g. 978-0-19-953556-8"
+               value="{{ entry.isbn if editing and entry.isbn else '' }}">
+      </div>
+      <div class="form-group" id="issn-group">
+        <label for="issn">ISSN</label>
+        <input id="issn" name="issn" type="text"
+               placeholder="e.g. 0028-0836"
+               value="{{ entry.issn if editing and entry.issn else '' }}">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="locus_code">LOCUS Code</label>
+      <input id="locus_code" name="locus_code" type="text"
+             placeholder="e.g. CS.A14"
+             value="{{ entry.locus_code if editing and entry.locus_code else '' }}">
+      <span class="field-hint">Bibliographic classification code in the LOCUS system.</span>
+    </div>
+
+    <div id="original-group">
+      <div class="form-row">
+        <div class="form-group">
+          <label for="edition">Edition</label>
+          <input id="edition" name="edition" type="text"
+                 placeholder="e.g. 2nd, Revised"
+                 value="{{ entry.edition if editing and entry.edition else '' }}">
+        </div>
+        <div class="form-group">
+          <label for="series_number">Series Number</label>
+          <input id="series_number" name="series_number" type="text"
+                 placeholder="e.g. 12"
+                 value="{{ entry.series_number if editing and entry.series_number else '' }}">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="original_year">Original Year</label>
+          <input id="original_year" name="original_year" type="text"
+                 placeholder="e.g. 1851"
+                 value="{{ entry.original_year if editing and entry.original_year else '' }}">
+        </div>
+        <div class="form-group">
+          <label for="original_publisher">Original Publisher</label>
+          <input id="original_publisher" name="original_publisher" type="text"
+                 value="{{ entry.original_publisher if editing and entry.original_publisher else '' }}">
+        </div>
+      </div>
+    </div>
+
+    <div id="conference-group">
+      <div class="form-group">
+        <label for="conference_name">Conference Name</label>
+        <input id="conference_name" name="conference_name" type="text"
+               placeholder="e.g. International Conference on Biblical Studies"
+               value="{{ entry.conference_name if editing and entry.conference_name else '' }}">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="conference_date">Conference Date</label>
+          <input id="conference_date" name="conference_date" type="text"
+                 placeholder="e.g. 2019-06"
+                 value="{{ entry.conference_date if editing and entry.conference_date else '' }}">
+        </div>
+        <div class="form-group">
+          <label for="conference_location">Conference Location</label>
+          <input id="conference_location" name="conference_location" type="text"
+                 placeholder="e.g. Oxford, UK"
+                 value="{{ entry.conference_location if editing and entry.conference_location else '' }}">
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="restricted">Access</label>
+      <select id="restricted" name="restricted">
+        <option value="unrestricted" {{ 'selected' if not editing or entry.restricted == 'unrestricted' else '' }}>Unrestricted</option>
+        <option value="restricted"   {{ 'selected' if editing and entry.restricted == 'restricted'   else '' }}>Restricted</option>
+        <option value="hidden"       {{ 'selected' if editing and entry.restricted == 'hidden'       else '' }}>Hidden</option>
+      </select>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="acquisition_date">Acquisition Date</label>
+        <input id="acquisition_date" name="acquisition_date" type="text"
+               placeholder="e.g. 2024-03"
+               value="{{ entry.acquisition_date if editing and entry.acquisition_date else '' }}">
+      </div>
+      <div class="form-group">
+        <label for="acquisition_source">Acquisition Source</label>
+        <input id="acquisition_source" name="acquisition_source" type="text"
+               placeholder="e.g. Gift, Amazon, Library sale"
+               value="{{ entry.acquisition_source if editing and entry.acquisition_source else '' }}">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="condition">Condition</label>
+      <input id="condition" name="condition" type="text"
+             placeholder="e.g. Good, Fair, Poor"
+             value="{{ entry.condition if editing and entry.condition else '' }}">
+    </div>
+
+    <div class="form-group">
+      <label for="abstract">Summary / Abstract</label>
+      <textarea id="abstract" name="abstract" rows="4"
+                placeholder="Brief summary or abstract of the content">{{ entry.abstract if editing and entry.abstract else '' }}</textarea>
+    </div>
+
+    <div class="form-group">
+      <label for="notes">Notes</label>
+      <textarea id="notes" name="notes" rows="3"
+                placeholder="Any additional notes about this entry">{{ entry.notes if editing and entry.notes else '' }}</textarea>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">
+        {{ 'Save Changes' if editing else 'Add Entry' }}
+      </button>
+      {% if editing %}
+        <a href="{{ url_for('entry_detail', entry_id=entry.id) }}"
+           class="btn btn-secondary">Cancel</a>
+      {% else %}
+        <a href="{{ url_for('index') }}" class="btn btn-secondary">Cancel</a>
+      {% endif %}
+    </div>
+
+  </form>
+</div>
+
+<script>
+  const typeSelect        = document.getElementById('type');
+  const pubLocGroup       = document.getElementById('pub-location-group');
+  const publisherGroup    = document.getElementById('publisher-group');
+  const isbnGroup         = document.getElementById('isbn-group');
+  const issnGroup         = document.getElementById('issn-group');
+  const seriesGroup       = document.getElementById('series-group');
+  const publicationGroup  = document.getElementById('publication-group');
+  const pubVolIssueRow    = document.getElementById('pub-vol-issue-row');
+  const bookTitleGroup    = document.getElementById('book-title-group');
+  const pagesGroup        = document.getElementById('pages-group');
+  const conferenceGroup   = document.getElementById('conference-group');
+  const originalGroup     = document.getElementById('original-group');
+  const typesWithLoc      = {{ types_with_pub_location | list | tojson }};
+
+  function updateTypeFields() {
+    const t = typeSelect.value;
+    const isArticle    = t === 'journal_article';
+    const isSection    = t === 'book_section';
+    const isConference = t === 'conference_proceedings';
+
+    publicationGroup.style.display  = isArticle    ? '' : 'none';
+    pubVolIssueRow.style.display    = isArticle    ? '' : 'none';
+    bookTitleGroup.style.display    = isSection    ? '' : 'none';
+    pagesGroup.style.display        = (isArticle || isSection) ? '' : 'none';
+    publisherGroup.style.display    = isArticle    ? 'none' : '';
+    pubLocGroup.style.display       = typesWithLoc.includes(t) ? '' : 'none';
+    isbnGroup.style.display         = (t === 'book' || isSection) ? '' : 'none';
+    issnGroup.style.display         = (t === 'book' || t === 'journal' || isArticle) ? '' : 'none';
+    seriesGroup.style.display       = (t === 'book' || isSection) ? '' : 'none';
+    conferenceGroup.style.display   = isConference    ? '' : 'none';
+    originalGroup.style.display     = (t === 'book')  ? '' : 'none';
+  }
+
+  typeSelect.addEventListener('change', updateTypeFields);
+  updateTypeFields();
+</script>
+{% endblock %}

@@ -1,0 +1,709 @@
+{% extends 'base.html' %}
+{% block title %}{{ entry.title or '(Untitled)' }} — Home Library Catalog{% endblock %}
+
+{% block content %}
+{% set can_edit = current_patron and current_patron.role in ('owner', 'cataloguer') %}
+<div class="breadcrumb">
+  <a href="{{ url_for('index') }}">Libraries</a> &rsaquo; {{ entry.title or '(Untitled)' }}
+</div>
+
+<div class="entry-heading">
+  <div>
+    <h1>{{ entry.title or '(Untitled)' }}</h1>
+    {% if entry.subtitle %}<p class="entry-subtitle">{{ entry.subtitle }}</p>{% endif %}
+    <span class="type-badge">{{ type_labels.get(entry.type, entry.type) }}</span>
+  </div>
+  {% if can_edit %}
+  <div class="page-actions">
+    <a href="{{ url_for('edit_entry', entry_id=entry.id) }}" class="btn btn-secondary btn-sm">
+      Edit
+    </a>
+    <form method="post" action="{{ url_for('delete_entry', entry_id=entry.id) }}"
+          class="delete-form"
+          onsubmit="return confirm('Delete this entry and all its volumes?')">
+      <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+    </form>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Citation -->
+<div class="citation-box">
+  <label>Chicago Citation</label>
+  <span>{{ citation | safe }}</span>
+</div>
+
+<!-- Contributors -->
+<div class="section-header">
+  <h2>Contributors</h2>
+</div>
+
+{% if contributors %}
+<table class="vol-table contributors-table">
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Role</th>
+      <th><span class="visually-hidden">Actions</span></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for c in contributors %}
+    <tr id="contrib-view-{{ c.id }}">
+      <td>{{ c.name }}</td>
+      <td><span class="type-badge">{{ contributor_roles | selectattr(0, 'equalto', c.role) | map(attribute=1) | first | default(c.role) }}</span></td>
+      <td class="vol-actions">
+        {% if can_edit %}
+        <button type="button" class="btn btn-secondary btn-sm"
+                onclick="toggleContribEdit({{ c.id }})">Edit</button>
+        <form method="post"
+              action="{{ url_for('delete_contributor', contributor_id=c.id) }}"
+              class="delete-form"
+              onsubmit="return confirm('Remove this contributor?')">
+          <button type="submit" class="btn btn-danger btn-sm">Remove</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% if can_edit %}
+    <tr id="contrib-edit-{{ c.id }}" class="vol-edit-row" hidden>
+      <form method="post" action="{{ url_for('edit_contributor', contributor_id=c.id) }}">
+        <td><input class="vol-input" name="name" type="text" value="{{ c.name }}"></td>
+        <td>
+          <select class="vol-input" name="role">
+            {% for rk, rl in contributor_roles %}
+            <option value="{{ rk }}" {{ 'selected' if c.role == rk else '' }}>{{ rl }}</option>
+            {% endfor %}
+          </select>
+        </td>
+        <td class="vol-actions">
+          <button type="submit" class="btn btn-primary btn-sm">Save</button>
+          <button type="button" class="btn btn-secondary btn-sm"
+                  onclick="toggleContribEdit({{ c.id }})">Cancel</button>
+        </td>
+      </form>
+    </tr>
+    {% endif %}
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty-state">No contributors recorded.{% if can_edit %} Add one below.{% endif %}</p>
+{% endif %}
+
+{% if can_edit %}
+<details class="add-volume-details">
+  <summary>Add a contributor</summary>
+  <form method="post" action="{{ url_for('add_contributor', entry_id=entry.id) }}" class="inline-form">
+    <div class="form-group">
+      <label>Name</label>
+      <input name="name" type="text" placeholder="Lastname, Firstname">
+    </div>
+    <div class="form-group">
+      <label>Role</label>
+      <select name="role">
+        {% for rk, rl in contributor_roles %}
+        <option value="{{ rk }}">{{ rl }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group form-group-btn">
+      <label>&nbsp;</label>
+      <button type="submit" class="btn btn-primary">Add</button>
+    </div>
+  </form>
+</details>
+{% endif %}
+
+<div class="section-header">
+  <h2>Core Metadata</h2>
+</div>
+
+<!-- Metadata -->
+<table class="meta-table">
+  {% if entry.title %}
+  <tr>
+    <th>Title</th>
+    <td>{{ entry.title }}</td>
+  </tr>
+  {% endif %}
+  {% if entry.year %}
+  <tr>
+    <th>Year</th>
+    <td>{{ entry.year }}</td>
+  </tr>
+  {% endif %}
+  {% if entry.publication %}
+  <tr>
+    <th>Publication</th>
+    <td>{{ entry.publication }}</td>
+  </tr>
+  {% endif %}
+  {% if entry.pub_volume or entry.pub_issue %}
+  <tr>
+    <th>Vol. / Issue</th>
+    <td>
+      {% if entry.pub_volume %}Vol. {{ entry.pub_volume }}{% endif %}
+      {% if entry.pub_volume and entry.pub_issue %}, {% endif %}
+      {% if entry.pub_issue %}No. {{ entry.pub_issue }}{% endif %}
+    </td>
+  </tr>
+  {% endif %}
+  {% if entry.book_title %}
+  <tr>
+    <th>Book Title</th>
+    <td>{{ entry.book_title }}</td>
+  </tr>
+  {% endif %}
+  {% if entry.pages %}
+  <tr>
+    <th>Pages</th>
+    <td>{{ entry.pages }}</td>
+  </tr>
+  {% endif %}
+  {% if entry.publisher %}
+  <tr>
+    <th>Publisher</th>
+    <td>{{ entry.publisher }}</td>
+  </tr>
+  {% endif %}
+  {% if entry.publisher_location %}
+  <tr>
+    <th>Publisher Location</th>
+    <td>{{ entry.publisher_location }}</td>
+  </tr>
+  {% endif %}
+  {% if entry.language %}
+  <tr>
+    <th>Language</th>
+    <td>{{ entry.language }}</td>
+  </tr>
+  {% endif %}
+  {% if entry.series %}
+  <tr>
+    <th>Series</th>
+    <td>{{ entry.series }}</td>
+  </tr>
+  {% endif %}
+  {% if entry.isbn %}
+  <tr>
+    <th>ISBN</th>
+    <td>{{ entry.isbn }}</td>
+  </tr>
+  {% endif %}
+  {% if entry.issn %}
+  <tr>
+    <th>ISSN</th>
+    <td>{{ entry.issn }}</td>
+  </tr>
+  {% endif %}
+  {% if subject_headings %}
+  <tr>
+    <th>Subject</th>
+    <td>
+      {% for sh in subject_headings %}
+        <a class="subject-tag" href="{{ url_for('subject_detail', heading_id=sh.id) }}">{{ sh.heading }}</a>
+      {% endfor %}
+    </td>
+  </tr>
+  {% endif %}
+  {% if entry.locus_code %}
+  <tr>
+    <th>LOCUS Code</th>
+    <td>{{ entry.locus_code }}</td>
+  </tr>
+  {% endif %}
+  {% if entry.edition %}
+  <tr>
+    <th>Edition</th>
+    <td>{{ entry.edition }}</td>
+  </tr>
+  {% endif %}
+  {% if entry.series_number %}
+  <tr>
+    <th>Series Number</th>
+    <td>{{ entry.series_number }}</td>
+  </tr>
+  {% endif %}
+  {% if entry.original_year or entry.original_publisher %}
+  <tr>
+    <th>Originally Published</th>
+    <td>
+      {% if entry.original_year %}{{ entry.original_year }}{% endif %}
+      {% if entry.original_year and entry.original_publisher %} — {% endif %}
+      {% if entry.original_publisher %}{{ entry.original_publisher }}{% endif %}
+    </td>
+  </tr>
+  {% endif %}
+  {% if entry.conference_name %}
+  <tr>
+    <th>Conference</th>
+    <td>{{ entry.conference_name }}</td>
+  </tr>
+  {% endif %}
+  {% if entry.conference_date or entry.conference_location %}
+  <tr>
+    <th>Conference Date / Location</th>
+    <td>
+      {% if entry.conference_date %}{{ entry.conference_date }}{% endif %}
+      {% if entry.conference_date and entry.conference_location %} — {% endif %}
+      {% if entry.conference_location %}{{ entry.conference_location }}{% endif %}
+    </td>
+  </tr>
+  {% endif %}
+  {% if entry.restricted and entry.restricted != 'unrestricted' %}
+  <tr>
+    <th>Access</th>
+    <td><span class="restricted-badge restricted-{{ entry.restricted }}">{{ entry.restricted | capitalize }}</span></td>
+  </tr>
+  {% endif %}
+  {% if entry.acquisition_date or entry.acquisition_source %}
+  <tr>
+    <th>Acquired</th>
+    <td>
+      {% if entry.acquisition_date %}{{ entry.acquisition_date }}{% endif %}
+      {% if entry.acquisition_date and entry.acquisition_source %} — {% endif %}
+      {% if entry.acquisition_source %}{{ entry.acquisition_source }}{% endif %}
+    </td>
+  </tr>
+  {% endif %}
+  {% if entry.condition %}
+  <tr>
+    <th>Condition</th>
+    <td>{{ entry.condition }}</td>
+  </tr>
+  {% endif %}
+  {% if entry.abstract %}
+  <tr>
+    <th>Summary / Abstract</th>
+    <td class="notes-cell">{{ entry.abstract }}</td>
+  </tr>
+  {% endif %}
+  {% if entry.notes %}
+  <tr>
+    <th>Notes</th>
+    <td class="notes-cell">{{ entry.notes }}</td>
+  </tr>
+  {% endif %}
+  {% if locations %}
+  <tr>
+    <th>Location{{ 's' if locations | length > 1 else '' }}</th>
+    <td>
+      {% for loc in locations %}
+        <a href="{{ url_for('library', library_id=loc.id) }}">{{ loc.name }}</a>{% if not loop.last %}, {% endif %}
+      {% endfor %}
+    </td>
+  </tr>
+  {% endif %}
+</table>
+
+<!-- Volumes -->
+<div class="section-header">
+  <h2>Volumes &amp; Copies <span class="vol-badge">{{ volumes | length }}</span></h2>
+</div>
+
+{% set has_storage_vols = volumes | selectattr('library_is_storage') | list | length > 0 %}
+{% if volumes %}
+<table class="vol-table">
+  <thead>
+    <tr>
+      <th>Vol. No.</th>
+      <th>Library</th>
+      <th>LOCUS Call No.</th>
+      <th>Barcode</th>
+      <th>Date</th>
+      {% if has_storage_vols %}<th>Box</th>{% endif %}
+      <th>Status</th>
+      <th>Flags</th>
+      <th><span class="visually-hidden">Actions</span></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for vol in volumes %}
+    {% set has_phys = vol.phys_dimensions or vol.phys_weight or vol.phys_pages or vol.phys_binding or vol.phys_color or vol.phys_material or vol.phys_notes %}
+    <!-- View row -->
+    <tr id="vol-view-{{ vol.id }}">
+      <td>{{ vol.volume_number or '—' }}</td>
+      <td>{{ vol.library_name or '—' }}</td>
+      <td class="lcc-code">{{ vol.locus_call_number or '—' }}</td>
+      <td>{{ vol.barcode or '—' }}</td>
+      <td>{{ vol.date or '—' }}</td>
+      {% if has_storage_vols %}
+        <td>{{ vol.box_number or ('—' if vol.library_is_storage else '') }}</td>
+      {% endif %}
+      <td>
+        {% if vol.checked_out %}
+          <span class="checked-out-badge">Checked Out</span>
+        {% elif vol.library_is_storage %}
+          <span class="in-storage-badge">In Storage</span>
+        {% else %}
+          <span class="in-library-badge">In Library</span>
+        {% endif %}
+      </td>
+      <td class="vol-flags">
+        {% if vol.is_missing %}<span class="vol-flag flag-missing">Missing</span>{% endif %}
+        {% if vol.is_fragile %}<span class="vol-flag flag-fragile">Fragile</span>{% endif %}
+        {% if vol.is_oversize %}<span class="vol-flag flag-oversize">Oversize</span>{% endif %}
+        {% if not vol.is_missing and not vol.is_fragile and not vol.is_oversize %}—{% endif %}
+      </td>
+      <td class="vol-actions">
+        {% if can_edit %}
+        <button type="button" class="btn btn-secondary btn-sm"
+                onclick="toggleVolEdit({{ vol.id }})">Edit</button>
+        <form method="post"
+              action="{{ url_for('delete_volume', volume_id=vol.id) }}"
+              class="delete-form"
+              onsubmit="return confirm('Delete this volume?')">
+          <button type="submit" class="btn btn-danger btn-sm">Remove</button>
+        </form>
+        {% endif %}
+        {% if has_phys %}
+        <button type="button" class="btn btn-secondary btn-sm"
+                onclick="toggleVolPhysView({{ vol.id }})">Physical</button>
+        {% endif %}
+      </td>
+    </tr>
+    <!-- Physical description view row (hidden by default) -->
+    {% if has_phys %}
+    <tr id="vol-phys-view-{{ vol.id }}" class="vol-phys-row" hidden>
+      <td colspan="100">
+        <div class="phys-desc-panel">
+          <span class="phys-desc-title">Physical Description</span>
+          <dl class="phys-desc-list">
+            {% if vol.phys_dimensions %}<div><dt>Dimensions</dt><dd>{{ vol.phys_dimensions }}</dd></div>{% endif %}
+            {% if vol.phys_weight %}<div><dt>Weight</dt><dd>{{ vol.phys_weight }}</dd></div>{% endif %}
+            {% if vol.phys_pages %}<div><dt>Pages</dt><dd>{{ vol.phys_pages }}</dd></div>{% endif %}
+            {% if vol.phys_binding %}<div><dt>Binding</dt><dd>{{ vol.phys_binding }}</dd></div>{% endif %}
+            {% if vol.phys_color %}<div><dt>Colour</dt><dd>{{ vol.phys_color }}</dd></div>{% endif %}
+            {% if vol.phys_material %}<div><dt>Material</dt><dd>{{ vol.phys_material }}</dd></div>{% endif %}
+            {% if vol.phys_notes %}<div class="phys-notes-item"><dt>Notes</dt><dd>{{ vol.phys_notes }}</dd></div>{% endif %}
+          </dl>
+        </div>
+      </td>
+    </tr>
+    {% endif %}
+    {% if can_edit %}
+    <!-- Inline edit row (hidden by default) -->
+    <tr id="vol-edit-{{ vol.id }}" class="vol-edit-row" hidden>
+      <form id="vol-form-{{ vol.id }}" method="post" action="{{ url_for('edit_volume', volume_id=vol.id) }}">
+        <td><input class="vol-input" name="volume_number" type="text"
+                   value="{{ vol.volume_number or '' }}"></td>
+        <td>
+          <select class="vol-input" name="library_id">
+            <option value="">— none —</option>
+            {% for lib in libraries %}
+            <option value="{{ lib.id }}"
+              {{ 'selected' if vol.library_id == lib.id else '' }}>
+              {{ lib.name }}
+            </option>
+            {% endfor %}
+          </select>
+        </td>
+        <td><input class="vol-input" name="locus_call_number" type="text"
+                   placeholder="LOCUS" value="{{ vol.locus_call_number or '' }}"></td>
+        <td><input class="vol-input" name="barcode" type="text"
+                   value="{{ vol.barcode or '' }}"></td>
+        <td><input class="vol-input" name="date" type="text"
+                   value="{{ vol.date or '' }}"></td>
+        {% if has_storage_vols %}
+        <td>
+          {% if vol.library_is_storage %}
+          <input class="vol-input" name="box_number" type="text"
+                 placeholder="Box" value="{{ vol.box_number or '' }}">
+          {% else %}
+          <input type="hidden" name="box_number" value="">
+          {% endif %}
+        </td>
+        {% endif %}
+        <td>
+          <label class="checkbox-label">
+            <input type="checkbox" name="checked_out" value="1"
+                   {{ 'checked' if vol.checked_out else '' }}>
+            Checked out
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" name="is_missing" value="1"
+                   {{ 'checked' if vol.is_missing else '' }}>
+            Missing
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" name="is_fragile" value="1"
+                   {{ 'checked' if vol.is_fragile else '' }}>
+            Fragile
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" name="is_oversize" value="1"
+                   {{ 'checked' if vol.is_oversize else '' }}>
+            Oversize
+          </label>
+        </td>
+        <td class="vol-actions">
+          <button type="submit" class="btn btn-primary btn-sm">Save</button>
+          <button type="button" class="btn btn-secondary btn-sm"
+                  onclick="toggleVolEdit({{ vol.id }})">Cancel</button>
+          <button type="button" class="btn btn-secondary btn-sm"
+                  onclick="toggleVolPhysEdit({{ vol.id }})">Physical&hellip;</button>
+        </td>
+      </form>
+    </tr>
+    <!-- Physical description edit row (hidden by default) -->
+    <tr id="vol-phys-edit-{{ vol.id }}" class="vol-phys-row vol-edit-row" hidden>
+      <td colspan="100">
+        <div class="phys-edit-panel">
+          <span class="phys-desc-title">Physical Description</span>
+          <div class="phys-edit-grid">
+            <label>Dimensions</label>
+            <input form="vol-form-{{ vol.id }}" class="vol-input" name="phys_dimensions" type="text"
+                   placeholder="e.g. 24 × 16 × 3 cm" value="{{ vol.phys_dimensions or '' }}">
+            <label>Weight</label>
+            <input form="vol-form-{{ vol.id }}" class="vol-input" name="phys_weight" type="text"
+                   placeholder="e.g. 450 g" value="{{ vol.phys_weight or '' }}">
+            <label>Pages</label>
+            <input form="vol-form-{{ vol.id }}" class="vol-input" name="phys_pages" type="text"
+                   placeholder="e.g. xii + 340" value="{{ vol.phys_pages or '' }}">
+            <label>Binding</label>
+            <input form="vol-form-{{ vol.id }}" class="vol-input" name="phys_binding" type="text"
+                   placeholder="e.g. Hardcover, Paperback" value="{{ vol.phys_binding or '' }}">
+            <label>Colour</label>
+            <input form="vol-form-{{ vol.id }}" class="vol-input" name="phys_color" type="text"
+                   placeholder="e.g. Full color, B&amp;W" value="{{ vol.phys_color or '' }}">
+            <label>Material</label>
+            <input form="vol-form-{{ vol.id }}" class="vol-input" name="phys_material" type="text"
+                   placeholder="e.g. Cloth, Leather, Folded" value="{{ vol.phys_material or '' }}">
+            <label class="phys-notes-label">Notes</label>
+            <textarea form="vol-form-{{ vol.id }}" class="vol-input" name="phys_notes"
+                      rows="2" placeholder="Additional physical notes">{{ vol.phys_notes or '' }}</textarea>
+          </div>
+        </div>
+      </td>
+    </tr>
+    {% endif %}
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty-state">No volumes recorded.{% if can_edit %} Add one below.{% endif %}</p>
+{% endif %}
+
+{% if can_edit %}
+<!-- Add volume -->
+<details class="add-volume-details" id="add-volume-details">
+  <summary>Add a volume</summary>
+  <form method="post"
+        action="{{ url_for('add_volume', entry_id=entry.id) }}"
+        class="inline-form">
+    <div class="form-group">
+      <label>Vol. No.</label>
+      <input name="volume_number" type="text" placeholder="e.g. 3">
+    </div>
+    <div class="form-group">
+      <label>Library</label>
+      <select id="add-vol-library" name="library_id">
+        <option value="">— none —</option>
+        {% for lib in libraries %}
+        <option value="{{ lib.id }}"
+          {{ 'selected' if default_library and default_library|int == lib.id else '' }}>
+          {{ lib.name }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group">
+      <label>LOCUS Call No.</label>
+      <input name="locus_call_number" type="text" placeholder="e.g. CS.A14.7">
+    </div>
+    <div class="form-group">
+      <label>Barcode</label>
+      <input name="barcode" type="text">
+    </div>
+    <div class="form-group">
+      <label>Date</label>
+      <input name="date" type="text" placeholder="e.g. 2023-05">
+    </div>
+    <div class="form-group">
+      <label class="checkbox-label">
+        <input type="checkbox" name="is_missing" value="1"> Missing
+      </label>
+      <label class="checkbox-label">
+        <input type="checkbox" name="is_fragile" value="1"> Fragile
+      </label>
+      <label class="checkbox-label">
+        <input type="checkbox" name="is_oversize" value="1"> Oversize
+      </label>
+    </div>
+    <div class="form-group" id="add-vol-box-group" hidden>
+      <label>Box Number</label>
+      <input name="box_number" type="text" placeholder="e.g. A3">
+    </div>
+    <div class="form-group">
+      <label class="checkbox-label">
+        <input type="checkbox" name="checked_out" value="1">
+        Checked out
+      </label>
+    </div>
+    <div class="form-group form-group-btn">
+      <label>&nbsp;</label>
+      <button type="submit" class="btn btn-primary">Add</button>
+    </div>
+  </form>
+</details>
+{% endif %}
+
+<!-- Digital Resources -->
+<div class="section-header digital-section-header">
+  <h2>Digital Resources <span class="vol-badge">{{ digital_resources | length }}</span></h2>
+</div>
+
+{% if digital_resources %}
+<table class="vol-table">
+  <thead>
+    <tr>
+      <th>Type</th>
+      <th>URL / Link</th>
+      <th>Call Number</th>
+      <th><span class="visually-hidden">Actions</span></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for dr in digital_resources %}
+    <tr id="dr-view-{{ dr.id }}">
+      <td><span class="type-badge">{{ digital_resource_type_labels.get(dr.resource_type, dr.resource_type) }}</span></td>
+      <td>
+        {% if dr.url %}
+          <a href="{{ dr.url }}" target="_blank" rel="noopener" class="digital-url">{{ dr.url }}</a>
+        {% else %}
+          —
+        {% endif %}
+      </td>
+      <td>{{ dr.call_number or '—' }}</td>
+      <td class="vol-actions">
+        {% if can_edit %}
+        <button type="button" class="btn btn-secondary btn-sm"
+                onclick="toggleDrEdit({{ dr.id }})">Edit</button>
+        <form method="post"
+              action="{{ url_for('delete_digital_resource', dr_id=dr.id) }}"
+              class="delete-form"
+              onsubmit="return confirm('Delete this digital resource?')">
+          <button type="submit" class="btn btn-danger btn-sm">Remove</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% if can_edit %}
+    <tr id="dr-edit-{{ dr.id }}" class="vol-edit-row" hidden>
+      <form method="post" action="{{ url_for('edit_digital_resource', dr_id=dr.id) }}">
+        <td>
+          <select class="vol-input" name="resource_type">
+            {% for rt_key, rt_label in digital_resource_types %}
+            <option value="{{ rt_key }}"
+              {{ 'selected' if dr.resource_type == rt_key else '' }}>
+              {{ rt_label }}
+            </option>
+            {% endfor %}
+          </select>
+        </td>
+        <td><input class="vol-input" name="url" type="text"
+                   placeholder="https:// or zotero://"
+                   value="{{ dr.url or '' }}"></td>
+        <td><input class="vol-input" name="call_number" type="text"
+                   value="{{ dr.call_number or '' }}"></td>
+        <td class="vol-actions">
+          <button type="submit" class="btn btn-primary btn-sm">Save</button>
+          <button type="button" class="btn btn-secondary btn-sm"
+                  onclick="toggleDrEdit({{ dr.id }})">Cancel</button>
+        </td>
+      </form>
+    </tr>
+    {% endif %}
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty-state">No digital resources recorded.</p>
+{% endif %}
+
+{% if can_edit %}
+<details class="add-volume-details">
+  <summary>Add a digital resource</summary>
+  <form method="post"
+        action="{{ url_for('add_digital_resource', entry_id=entry.id) }}"
+        class="inline-form">
+    <div class="form-group">
+      <label>Type</label>
+      <select name="resource_type">
+        {% for rt_key, rt_label in digital_resource_types %}
+        <option value="{{ rt_key }}">{{ rt_label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group digital-url-group">
+      <label>URL / Link</label>
+      <input name="url" type="text" placeholder="https:// or zotero://">
+    </div>
+    <div class="form-group">
+      <label>Call Number</label>
+      <input name="call_number" type="text" placeholder="e.g. QA76.9.D3">
+    </div>
+    <div class="form-group form-group-btn">
+      <label>&nbsp;</label>
+      <button type="submit" class="btn btn-primary">Add</button>
+    </div>
+  </form>
+</details>
+{% endif %}
+
+<script>
+{% if default_library %}
+document.getElementById('add-volume-details').open = true;
+{% endif %}
+
+(function () {
+  const storageIds = new Set({{ storage_lib_ids | tojson }});
+  const libSel  = document.getElementById('add-vol-library');
+  const boxGroup = document.getElementById('add-vol-box-group');
+  function syncBoxField() {
+    boxGroup.hidden = !storageIds.has(parseInt(libSel.value));
+  }
+  libSel.addEventListener('change', syncBoxField);
+  syncBoxField();
+})();
+
+function toggleVolEdit(id) {
+  const view     = document.getElementById('vol-view-' + id);
+  const edit     = document.getElementById('vol-edit-' + id);
+  const physView = document.getElementById('vol-phys-view-' + id);
+  const physEdit = document.getElementById('vol-phys-edit-' + id);
+  const editing  = !edit.hidden;
+  view.hidden = !editing ? true  : false;
+  edit.hidden = !editing ? false : true;
+  if (physView) physView.hidden = true;
+  if (physEdit) physEdit.hidden = true;
+}
+
+function toggleVolPhysView(id) {
+  const row = document.getElementById('vol-phys-view-' + id);
+  if (row) row.hidden = !row.hidden;
+}
+
+function toggleVolPhysEdit(id) {
+  const row = document.getElementById('vol-phys-edit-' + id);
+  if (row) row.hidden = !row.hidden;
+}
+
+function toggleDrEdit(id) {
+  const view = document.getElementById('dr-view-' + id);
+  const edit = document.getElementById('dr-edit-' + id);
+  const editing = !edit.hidden;
+  view.hidden = !editing ? true  : false;
+  edit.hidden = !editing ? false : true;
+}
+
+function toggleContribEdit(id) {
+  const view = document.getElementById('contrib-view-' + id);
+  const edit = document.getElementById('contrib-edit-' + id);
+  const editing = !edit.hidden;
+  view.hidden = !editing ? true  : false;
+  edit.hidden = !editing ? false : true;
+}
+</script>
+{% endblock %}

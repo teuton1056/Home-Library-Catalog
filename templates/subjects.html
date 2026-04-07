@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% block title %}Subject Headings — Home Library Catalog{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Subject Headings</h1>
+  {% if current_patron and current_patron.role in ('owner', 'cataloguer') %}
+  <a href="{{ url_for('new_subject') }}" class="btn btn-primary btn-sm">+ New Heading</a>
+  {% endif %}
+</div>
+
+<form method="get" action="{{ url_for('subjects') }}" class="subject-search-form">
+  <input type="text" name="q" value="{{ query }}" placeholder="Search headings…" class="subject-search-input" autofocus>
+  <button type="submit" class="btn btn-secondary btn-sm">Search</button>
+  {% if query %}<a href="{{ url_for('subjects') }}" class="btn btn-secondary btn-sm">Clear</a>{% endif %}
+</form>
+
+{% if headings %}
+<table class="data-table subject-list-table">
+  <thead>
+    <tr>
+      <th>Heading</th>
+      <th>Type</th>
+      <th>Entries</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for h in headings %}
+    <tr>
+      <td>
+        <a href="{{ url_for('subject_detail', heading_id=h.id) }}">{{ h.heading }}</a>
+      </td>
+      <td class="subject-type-cell">
+        {% if h.type %}
+          <span class="subject-type-badge subject-type-{{ h.type }}">{{ h.type | capitalize }}</span>
+        {% endif %}
+      </td>
+      <td class="subject-count-cell">{{ h.entry_count }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% elif query %}
+<p class="empty-state">No headings match <em>{{ query }}</em>.</p>
+{% else %}
+<p class="empty-state">No subject headings have been defined yet.</p>
+{% endif %}
+{% endblock %}

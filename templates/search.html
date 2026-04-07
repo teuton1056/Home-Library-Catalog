@@ -1,0 +1,288 @@
+{% extends 'base.html' %}
+{% block title %}Search — Home Library Catalog{% endblock %}
+
+{% block content %}
+<h1>Search</h1>
+
+<form id="search-form" method="get" action="{{ url_for('search') }}">
+
+  <!-- Shared filters: always submitted regardless of mode -->
+  <div class="search-shared-filters">
+    <div class="form-group">
+      <label for="library_id">Collection</label>
+      <select id="library_id" name="library_id">
+        <option value="">All libraries</option>
+        {% for lib in all_libraries %}
+        <option value="{{ lib.id }}"
+          {{ 'selected' if selected_library and selected_library|int == lib.id else '' }}>
+          {{ lib.name }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group">
+      <label for="type">Type</label>
+      <select id="type" name="type">
+        <option value="">All types</option>
+        {% for type_key, type_label in entry_types %}
+        <option value="{{ type_key }}"
+          {{ 'selected' if selected_type == type_key else '' }}>
+          {{ type_label }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+
+  <!-- Mode tab bar -->
+  <div class="search-tabs" role="tablist">
+    <button type="button" id="tab-basic" class="search-tab" role="tab"
+            aria-selected="{{ 'false' if adv else 'true' }}"
+            aria-controls="panel-basic">Basic</button>
+    <button type="button" id="tab-adv" class="search-tab" role="tab"
+            aria-selected="{{ 'true' if adv else 'false' }}"
+            aria-controls="panel-adv">Advanced</button>
+  </div>
+
+  <!-- Basic panel -->
+  <div id="panel-basic" class="search-panel{% if not adv %} is-active{% endif %}" role="tabpanel">
+    <div class="search-basic-row">
+      <input id="q" name="q" type="text" value="{{ query }}" autocomplete="off"
+             placeholder="Title, author, barcode, call number…">
+      <button type="submit" class="btn btn-primary">Search</button>
+      <a href="{{ url_for('barcode_search') }}" class="btn btn-secondary">Barcode Scan</a>
+    </div>
+  </div>
+
+  <!-- Advanced panel -->
+  <div id="panel-adv" class="search-panel{% if adv %} is-active{% endif %}" role="tabpanel">
+    <div id="adv-rows">
+      {% if adv and adv_rows %}
+        {% for row in adv_rows %}
+        <div class="adv-row" data-index="{{ loop.index0 }}">
+          <div class="adv-op-cell">
+            {% if not loop.first %}
+            <select name="op_{{ loop.index0 }}" class="adv-op-select" aria-label="Boolean operator">
+              <option value="AND" {{ 'selected' if row.op == 'AND' }}>AND</option>
+              <option value="OR"  {{ 'selected' if row.op == 'OR'  }}>OR</option>
+              <option value="NOT" {{ 'selected' if row.op == 'NOT' }}>NOT</option>
+            </select>
+            {% endif %}
+          </div>
+          <div class="adv-field-cell">
+            <select name="field_{{ loop.index0 }}" class="adv-field-select" aria-label="Search field">
+              {% for fval, flabel in adv_fields %}
+              <option value="{{ fval }}" {{ 'selected' if row.field == fval }}>{{ flabel }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="adv-term-cell">
+            <input type="text" name="term_{{ loop.index0 }}" class="adv-term-input"
+                   value="{{ row.term }}" placeholder="Search terms…" autocomplete="off">
+          </div>
+          {% if loop.first %}
+          <span class="adv-remove-placeholder"></span>
+          {% else %}
+          <button type="button" class="adv-remove-row btn btn-secondary btn-sm"
+                  aria-label="Remove row">&times;</button>
+          {% endif %}
+        </div>
+        {% endfor %}
+      {% endif %}
+    </div>
+    <div class="adv-footer">
+      <button type="button" id="adv-add-row" class="btn btn-secondary btn-sm">+ Add row</button>
+      <button type="submit" class="btn btn-primary">Search</button>
+      <a href="{{ url_for('barcode_search') }}" class="btn btn-secondary">Barcode Scan</a>
+    </div>
+    <input type="hidden" name="adv" id="adv-flag" value="1">
+  </div>
+
+</form>
+
+{% if is_searched %}
+  <p class="result-count">
+    {% if results %}
+      {{ results | length }} result{{ 's' if results | length != 1 else '' }}
+      {% if adv %}for <strong>advanced search</strong>
+      {% else %}for <strong>{{ query }}</strong>{% endif %}
+    {% else %}
+      No results{% if adv %} for advanced search
+      {% else %} for <strong>{{ query }}</strong>{% endif %}.
+    {% endif %}
+  </p>
+
+  {% if results %}
+  <div class="sort-bar">
+    <span class="sort-bar-label">Sort:</span>
+    {% for key, label in sort_options %}
+      {% set params = request.args.to_dict() %}
+      {% set _ = params.update({'sort': key}) %}
+      <a href="?{{ params | urlencode }}"
+         class="sort-bar-btn{% if sort == key %} active{% endif %}">{{ label }}</a>
+    {% endfor %}
+  </div>
+  <ul class="entry-list search-results">
+    {% for entry in results %}
+    <li class="entry-item">
+      <div class="entry-title-block">
+        <a class="entry-title" href="{{ url_for('entry_detail', entry_id=entry.id) }}">
+          {{ entry.title or '(Untitled)' }}
+        </a>
+        <span class="type-badge">{{ type_labels.get(entry.type, entry.type) }}</span>
+      </div>
+      <div class="entry-meta-block">
+        {% if entry.author %}<span class="entry-meta">{{ entry.author }}</span>{% endif %}
+        {% if entry.year %}<span class="entry-meta">{{ entry.year }}</span>{% endif %}
+        <span class="entry-meta library-name">{{ entry.library_names or '(no location)' }}</span>
+        <span class="entry-meta shelfmark-display">
+          &mdash;
+          {% if entry.volume_count == 0 and entry.digital_count %}
+            <span class="digital-only-badge">Digital Resource Only</span>
+          {% elif entry.volume_count == 0 %}
+            <span class="no-shelfmark">No Call Number Recorded</span>
+          {% elif entry.first_call_number %}
+            {{ entry.first_call_number }}
+          {% else %}
+            &mdash;
+          {% endif %}
+        </span>
+        <span class="vol-count">
+          {{ entry.volume_count }} {{ 'vol.' if entry.volume_count == 1 else 'vols.' }}
+          {% if entry.digital_count %}&middot; {{ entry.digital_count }} digital{% endif %}
+        </span>
+        {% if entry.checked_out_count %}
+          <span class="checked-out-badge">
+            {{ entry.checked_out_count }} checked out
+          </span>
+        {% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+{% else %}
+  <p class="empty-state">Enter a search term above to search the catalog.</p>
+{% endif %}
+
+<script>
+// ── Advanced search ────────────────────────────────────────────────────────
+const ADV_FIELDS = {{ adv_fields | tojson }};  // [[value, label], ...]
+const MAX_ROWS   = 6;
+
+const form       = document.getElementById('search-form');
+const tabBasic   = document.getElementById('tab-basic');
+const tabAdv     = document.getElementById('tab-adv');
+const panelBasic = document.getElementById('panel-basic');
+const panelAdv   = document.getElementById('panel-adv');
+const advRowsEl  = document.getElementById('adv-rows');
+const advAddBtn  = document.getElementById('adv-add-row');
+const advFlag    = document.getElementById('adv-flag');
+const basicQ     = document.getElementById('q');
+
+// Counter starts after any server-rendered rows so JS-added rows get fresh indices
+let rowCounter = advRowsEl.querySelectorAll('.adv-row').length;
+
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function fieldSelect(name, selected) {
+  const opts = ADV_FIELDS.map(([v, l]) =>
+    `<option value="${esc(v)}"${v === selected ? ' selected' : ''}>${l}</option>`
+  ).join('');
+  return `<select name="${esc(name)}" class="adv-field-select" aria-label="Search field">${opts}</select>`;
+}
+
+function opSelect(name, selected) {
+  return `<select name="${esc(name)}" class="adv-op-select" aria-label="Boolean operator">` +
+    ['AND','OR','NOT'].map(v =>
+      `<option value="${v}"${v === selected ? ' selected' : ''}>${v}</option>`
+    ).join('') + `</select>`;
+}
+
+function addRow(field, op, term) {
+  field = field || 'any';
+  op    = op    || 'AND';
+  term  = term  || '';
+  const idx     = rowCounter++;
+  const isFirst = advRowsEl.children.length === 0;
+  const row     = document.createElement('div');
+  row.className   = 'adv-row';
+  row.dataset.index = idx;
+  row.innerHTML =
+    `<div class="adv-op-cell">${isFirst ? '' : opSelect('op_'+idx, op)}</div>` +
+    `<div class="adv-field-cell">${fieldSelect('field_'+idx, field)}</div>` +
+    `<div class="adv-term-cell">` +
+      `<input type="text" name="term_${idx}" class="adv-term-input" ` +
+      `value="${esc(term)}" placeholder="Search terms…" autocomplete="off">` +
+    `</div>` +
+    (isFirst
+      ? `<span class="adv-remove-placeholder"></span>`
+      : `<button type="button" class="adv-remove-row btn btn-secondary btn-sm" ` +
+        `aria-label="Remove row">&times;</button>`);
+  if (!isFirst) {
+    row.querySelector('.adv-remove-row').addEventListener('click', () => removeRow(row));
+  }
+  advRowsEl.appendChild(row);
+  syncAddButton();
+}
+
+function removeRow(row) {
+  row.remove();
+  reindex();
+  if (!advRowsEl.children.length) addRow();
+  syncAddButton();
+}
+
+function reindex() {
+  // Renumber all rows sequentially so URL has no gaps after removal
+  Array.from(advRowsEl.children).forEach((row, i) => {
+    row.dataset.index = i;
+    const op    = row.querySelector('.adv-op-select');
+    const field = row.querySelector('.adv-field-select');
+    const term  = row.querySelector('.adv-term-input');
+    if (op)    op.name    = `op_${i}`;
+    if (field) field.name = `field_${i}`;
+    if (term)  term.name  = `term_${i}`;
+  });
+  rowCounter = advRowsEl.children.length;
+}
+
+function syncAddButton() {
+  advAddBtn.disabled = advRowsEl.children.length >= MAX_ROWS;
+}
+
+function activateTab(isAdv) {
+  tabBasic.setAttribute('aria-selected', isAdv ? 'false' : 'true');
+  tabAdv.setAttribute('aria-selected',   isAdv ? 'true'  : 'false');
+  panelBasic.classList.toggle('is-active', !isAdv);
+  panelAdv.classList.toggle('is-active',    isAdv);
+}
+
+tabBasic.addEventListener('click', () => activateTab(false));
+tabAdv.addEventListener('click', () => {
+  activateTab(true);
+  if (!advRowsEl.children.length) addRow();
+});
+advAddBtn.addEventListener('click', () => addRow());
+
+// Disable inactive panel's inputs on submit to keep URL clean
+form.addEventListener('submit', () => {
+  if (panelAdv.classList.contains('is-active')) {
+    basicQ.disabled = true;
+  } else {
+    advFlag.disabled = true;
+    advRowsEl.querySelectorAll('input, select').forEach(el => el.disabled = true);
+  }
+});
+
+// Attach handlers to any server-rendered remove buttons
+advRowsEl.querySelectorAll('.adv-remove-row').forEach(btn => {
+  btn.addEventListener('click', () => removeRow(btn.closest('.adv-row')));
+});
+syncAddButton();
+</script>
+{% endblock %}

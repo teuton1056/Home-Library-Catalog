@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block title %}Currently Checked Out — Home Library Catalog{% endblock %}
+
+{% block content %}
+<h1>Currently Checked Out</h1>
+
+{% if checked_out %}
+<table class="data-table">
+  <thead>
+    <tr>
+      <th>Title</th>
+      <th>Barcode</th>
+      <th>Library</th>
+      <th>Patron</th>
+      <th>Checked Out</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in checked_out %}
+    <tr>
+      <td><a href="{{ url_for('entry_detail', entry_id=row.entry_id) }}">{{ row.title }}</a>
+        {% if row.volume_number %}<span class="vol-num">vol. {{ row.volume_number }}</span>{% endif %}
+      </td>
+      <td class="mono">{{ row.barcode or '—' }}</td>
+      <td>{{ row.library_name or '—' }}</td>
+      <td>
+        <a href="{{ url_for('patron_checkout_history', patron_id=row.patron_id) }}">{{ row.patron_name }}</a>
+        <span class="patron-num">({{ row.patron_number }})</span>
+      </td>
+      <td class="date-cell">{{ row.checkout_time or '—' }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty-state">No items are currently checked out.</p>
+{% endif %}
+{% endblock %}

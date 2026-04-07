@@ -1,0 +1,248 @@
+{% extends 'base.html' %}
+{% block title %}About — Home Library Catalog{% endblock %}
+
+{% block content %}
+<div class="about-page">
+
+<h1>About This Catalog</h1>
+<p class="about-lead">
+  A personal library management system for cataloguing physical and digital collections
+  across multiple locations, with a controlled vocabulary subject index, patron accounts,
+  role-based access control, and a circulation desk.
+</p>
+
+<div class="about-stats">
+  <div class="about-stat">
+    <span class="about-stat-num">{{ stats.library_count }}</span>
+    <span class="about-stat-label">{{ 'Library' if stats.library_count == 1 else 'Libraries' }}</span>
+  </div>
+  <div class="about-stat">
+    <span class="about-stat-num">{{ stats.entry_count }}</span>
+    <span class="about-stat-label">{{ 'Entry' if stats.entry_count == 1 else 'Entries' }}</span>
+  </div>
+  <div class="about-stat">
+    <span class="about-stat-num">{{ stats.volume_count }}</span>
+    <span class="about-stat-label">{{ 'Volume' if stats.volume_count == 1 else 'Volumes' }}</span>
+  </div>
+  <div class="about-stat">
+    <span class="about-stat-num">{{ stats.digital_count }}</span>
+    <span class="about-stat-label">{{ 'Digital Resource' if stats.digital_count == 1 else 'Digital Resources' }}</span>
+  </div>
+  <div class="about-stat">
+    <span class="about-stat-num">{{ stats.locus_count }}</span>
+    <span class="about-stat-label">LOCUS Catalogued</span>
+  </div>
+  <div class="about-stat">
+    <span class="about-stat-num">{{ stats.subject_count }}</span>
+    <span class="about-stat-label">{{ 'Subject Heading' if stats.subject_count == 1 else 'Subject Headings' }}</span>
+  </div>
+</div>
+
+<div class="about-sections">
+
+  <section class="about-section">
+    <h2>Collections</h2>
+    <p>
+      The catalog supports any number of named <strong>libraries</strong> — independent
+      physical locations such as a home bookshelf, an office collection, or a storage unit.
+      One library can be marked as <strong>Primary</strong>, which causes it to open
+      automatically on the home page. Libraries marked as <strong>Storage</strong> show
+      a distinct amber indicator on their volumes and expose a <em>Box Number</em> field
+      for tracking which box a volume is packed in.
+    </p>
+    <p>
+      Creating, renaming, and deleting libraries is restricted to the <strong>owner</strong>
+      account.
+    </p>
+  </section>
+
+  <section class="about-section">
+    <h2>Entries &amp; Volumes</h2>
+    <p>
+      A <strong>catalog entry</strong> is a pure bibliographic record — it describes a
+      work, not a physical object. The same entry can have copies in multiple libraries
+      with no duplication of bibliographic data.
+    </p>
+    <p>
+      Each physical copy is tracked as a <strong>volume</strong>, which records the
+      library it lives in, its LOCUS call number, barcode, volume number
+      (for multi-volume works), acquisition date, and condition flags for oversize,
+      missing, and fragile items. Volumes can also carry an optional
+      <strong>physical description</strong> — dimensions, weight, page count, binding
+      style, colour, material, and freeform notes — shown as a collapsible panel on
+      the entry detail page.
+    </p>
+    <p>
+      Digital copies are tracked as <strong>digital resources</strong>, each with a URL
+      (supporting <code>https://</code> and <code>zotero://</code> schemes),
+      an optional call number, and a type of either <em>Full Text</em> or
+      <em>Table of Contents</em>.
+    </p>
+    <p>
+      Contributors (authors, editors, translators, compilers, illustrators, and other
+      contributors) are tracked as a structured list on each entry, with an explicit
+      role per person. Multiple contributors can be recorded, ordered, and edited
+      independently. The contributor list feeds directly into the Chicago citation
+      generator.
+    </p>
+    <p>Eleven entry types are supported:</p>
+    <ul class="about-type-list">
+      <li><strong>Book</strong> — ISBN, ISSN, Series, Series Number, Edition, Original Year, Original Publisher, Publisher, Publisher Location</li>
+      <li><strong>Book Section</strong> — Book Title, Pages, ISBN, Series, Publisher, Publisher Location</li>
+      <li><strong>Journal</strong> — ISSN, Publisher</li>
+      <li><strong>Journal Article</strong> — Publication, Volume, Issue, Pages, ISSN</li>
+      <li><strong>Map</strong></li>
+      <li><strong>Pamphlet</strong></li>
+      <li><strong>DVD / CD / VHS Tape</strong></li>
+      <li><strong>Conference Proceedings</strong> — Conference Name, Date, and Location</li>
+      <li><strong>Government Document</strong></li>
+    </ul>
+    <p>
+      All entries also carry Title, Subtitle, Year, Language, Notes, Condition,
+      Acquisition Date, Acquisition Source, Abstract, and a <strong>LOCUS Code</strong>
+      field for the full LOCUS call number assigned during cataloguing. Subject access
+      points are linked controlled vocabulary headings rather than free-text tags — see
+      <em>Subject Headings</em> below.
+    </p>
+  </section>
+
+  <section class="about-section">
+    <h2>Patrons &amp; Access Control</h2>
+    <p>
+      The catalog supports multiple named patron accounts. Login is by patron number and
+      password. Five roles control what each patron can see and do:
+    </p>
+    <ul class="about-type-list">
+      <li><strong>Owner</strong> — full access to everything, including patron and library administration. Only one owner is permitted.</li>
+      <li><strong>Cataloguer</strong> — can view all entries and make all cataloguing changes; cannot add, remove, or configure libraries or patrons.</li>
+      <li><strong>Regular</strong> — can browse and search unrestricted and restricted entries; cannot make changes.</li>
+      <li><strong>Restricted</strong> — same browse permissions as Regular.</li>
+      <li><strong>Guest</strong> — can browse and search unrestricted entries only.</li>
+    </ul>
+    <p>
+      Unauthenticated visitors have guest-level access. The owner sets and resets patron
+      passwords from the Manage page.
+    </p>
+    <p>
+      Each entry carries a <strong>visibility</strong> field — <em>Unrestricted</em>,
+      <em>Restricted</em>, or <em>Hidden</em> — which controls which roles can see it in
+      search results, library views, and on the entry detail page.
+    </p>
+  </section>
+
+  <section class="about-section">
+    <h2>Subject Headings</h2>
+    <p>
+      Subject access is managed through a controlled vocabulary modelled on the LOCUS
+      subject heading system. Each heading is a distinct record with an optional
+      <strong>type</strong> (Region, People, Person, Topic, Event, Language, or Work),
+      a <strong>scope note</strong>, and structured relations to other headings:
+    </p>
+    <ul class="about-type-list">
+      <li><strong>BT / NT</strong> — Broader Term / Narrower Term (automatically reciprocated)</li>
+      <li><strong>RT</strong> — Related Term (automatically reciprocated)</li>
+      <li><strong>USE / UF</strong> — preferred form / non-preferred form (automatically reciprocated)</li>
+      <li><strong>SA</strong> — See Also (one-directional)</li>
+      <li><strong>SE</strong> — See Entry (one-directional)</li>
+    </ul>
+    <p>
+      Entries may only be tagged with <strong>preferred forms</strong>. If a non-preferred
+      (USE) heading is entered, the system automatically substitutes the preferred form
+      and notifies the cataloguer with a flash message.
+    </p>
+    <p>
+      The subject heading browse page is accessible to Regular patrons and above. Guests
+      and unauthenticated visitors do not have access to the subject index. Creating,
+      editing, and deleting headings is restricted to <strong>Owner</strong> and
+      <strong>Cataloguer</strong> accounts.
+    </p>
+    <p>
+      Each heading detail page lists all entries tagged with that heading, and related
+      headings can be previewed in a side panel without leaving the page.
+    </p>
+  </section>
+
+  <section class="about-section">
+    <h2>Circulation Desk</h2>
+    <p>
+      The <strong>Checkout Desk</strong> provides a full circulation workflow for owner
+      and cataloguer accounts. Items are added to a bin by scanning their barcodes, then
+      checked out to a patron by patron number, checked back in, or transferred to a
+      different library. Transfers automatically close any open checkout record for the
+      moved volume.
+    </p>
+    <p>
+      The <strong>On Loan</strong> page shows every currently checked-out item alongside
+      the borrowing patron and checkout time. Each patron's full checkout history is
+      available from their record.
+    </p>
+  </section>
+
+  <section class="about-section">
+    <h2>Search</h2>
+    <p>
+      Full-text search spans every bibliographic and physical field: title, author,
+      year, language, publisher, subject headings, series, ISBN, ISSN, LOCUS
+      call number, LOCUS code, barcode, volume number, and date. Results can be
+      filtered by collection and entry type. Search results respect the access level
+      of the logged-in patron — hidden or restricted entries are filtered automatically.
+    </p>
+    <p>
+      <strong>Advanced Search</strong> allows multi-field boolean queries using AND and
+      NOT operators across individual fields or all fields at once.
+    </p>
+    <p>
+      The <strong>Barcode Scan</strong> mode accepts a single barcode (typed or
+      scanned with a hardware reader) and jumps directly to the matching entry.
+      The input is focused automatically and submits on Enter, so a barcode scanner
+      works hands-free.
+    </p>
+  </section>
+
+  <section class="about-section">
+    <h2>Citations</h2>
+    <p>
+      A Chicago-style citation is automatically generated for every entry and shown
+      at the top of its detail page.
+    </p>
+  </section>
+
+  <section class="about-section">
+    <h2>Physical Audit</h2>
+    <p>
+      Audit mode lets you verify which volumes are physically present in a given
+      library. A barcode scanner (or keyboard) is used to scan each item; the tool
+      provides immediate colour-coded feedback (found, already scanned, not found)
+      and tracks progress with a live counter. At the end of a session, a
+      printer-friendly report lists all volumes that were not scanned.
+    </p>
+  </section>
+
+  <section class="about-section">
+    <h2>Import &amp; Export</h2>
+    <p>
+      Bulk import from a <strong>LibraryThing JSON export</strong>
+      (<code>librarything.json</code> placed in the application directory).
+      Single-volume entries are created automatically with a sequential barcode. Multi-volume books are split into numbered volumes; other
+      multi-volume entries are flagged for manual review.
+    </p>
+    <p>
+      The catalog can be exported at any time as a ZIP archive containing four CSV
+      files: the raw <code>libraries</code>, <code>entries</code>, and
+      <code>volumes</code> tables, plus a fully joined <code>catalog</code> sheet
+      with one row per volume.
+    </p>
+  </section>
+
+  <section class="about-section">
+    <h2>Backups</h2>
+    <p>
+      Every write operation automatically saves a backup of the database.
+      Short-term backups (the last 5 changes) are kept in <code>backups/short/</code>.
+      Daily backups (the last 30 days) are kept in <code>backups/daily/</code>.
+    </p>
+  </section>
+
+</div>
+</div>
+{% endblock %}

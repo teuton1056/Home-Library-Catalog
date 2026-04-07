@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+{% block title %}{{ heading.heading }} — Subject Headings{% endblock %}
+
+{% block content %}
+<div class="subject-detail-layout">
+  <div class="subject-detail-main">
+
+    <div class="page-header">
+      <div class="page-header-left">
+        <a href="{{ url_for('subjects') }}" class="back-link">&larr; Subject Headings</a>
+        <h1 class="subject-detail-heading">{{ heading.heading }}</h1>
+        {% if heading.type %}
+          <span class="subject-type-badge subject-type-{{ heading.type }}">{{ heading_type_labels.get(heading.type, heading.type) }}</span>
+        {% endif %}
+      </div>
+      {% if current_patron and current_patron.role in ('owner', 'cataloguer') %}
+      <div class="page-header-actions">
+        <a href="{{ url_for('edit_subject', heading_id=heading.id) }}" class="btn btn-secondary btn-sm">Edit</a>
+        <a href="{{ url_for('delete_subject', heading_id=heading.id) }}" class="btn btn-danger btn-sm">Delete</a>
+      </div>
+      {% endif %}
+    </div>
+
+    {# Non-preferred form warning #}
+    {% set use_rels = relations | selectattr('relation_type', 'equalto', 'USE') | list %}
+    {% if use_rels %}
+    <div class="subject-nonpreferred-notice">
+      <strong>Non-preferred form.</strong>
+      Use instead:
+      {% for rel in use_rels %}
+        <a href="{{ url_for('subject_detail', heading_id=rel.target_id) }}"
+           class="subject-preferred-link">{{ rel.target_heading }}</a>{% if not loop.last %}, {% endif %}
+      {% endfor %}
+      <br>Entries should not be tagged with this heading directly.
+    </div>
+    {% endif %}
+
+    {% if heading.scope_note %}
+    <div class="subject-scope-note">
+      <p>{{ heading.scope_note }}</p>
+    </div>
+    {% endif %}
+
+    {# Relations grouped by type #}
+    {% set rel_order = ['PARENT','CHILD','USE','UF','BT','NT','RT','SA','SE'] %}
+    {% set grouped = {} %}
+    {% for rel in relations %}
+      {% if rel.relation_type not in grouped %}
+        {% set _ = grouped.update({rel.relation_type: []}) %}
+      {% endif %}
+      {% set _ = grouped[rel.relation_type].append(rel) %}
+    {% endfor %}
+
+    {% if relations %}
+    <div class="subject-relations">
+      {% for rtype in rel_order %}
+        {% if rtype in grouped %}
+        <div class="relation-group">
+          <span class="relation-type-label">{{ relation_type_labels[rtype] }}:</span>
+          <span class="relation-targets">
+            {% for rel in grouped[rtype] %}
+              <button type="button" class="subject-rel-btn"
+                      data-href="{{ url_for('subject_detail', heading_id=rel.target_id) }}"
+                      data-preview="{{ url_for('subject_preview', heading_id=rel.target_id) }}"
+                      onclick="loadSubjectPreview(this)">{{ rel.target_heading }}</button>{% if not loop.last %}, {% endif %}
+            {% endfor %}
+          </span>
+        </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {# Entries #}
+    <section class="subject-entries">
+      <h2>Entries ({{ entries | length }})</h2>
+      {% if entries %}
+      <table class="data-table">
+        <thead>
+          <tr><th>Title</th><th>Author</th><th>Type</th><th>Year</th></tr>
+        </thead>
+        <tbody>
+          {% for e in entries %}
+          <tr>
+            <td><a href="{{ url_for('entry_detail', entry_id=e.id) }}">{{ e.title or '(Untitled)' }}</a></td>
+            <td>{{ e.first_author or '' }}</td>
+            <td>{{ type_labels.get(e.type, e.type) }}</td>
+            <td>{{ e.year or '' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="empty-state">No entries are tagged with this heading.</p>
+      {% endif %}
+    </section>
+
+  </div>{# .subject-detail-main #}
+
+  {# Side preview panel — populated by JS #}
+  <aside class="subject-preview-panel" id="subject-preview-panel" hidden>
+    <div class="subject-preview-header">
+      <span class="subject-preview-title" id="subject-preview-title"></span>
+      <button type="button" class="subject-preview-close" onclick="closeSubjectPreview()">&times;</button>
+    </div>
+    <div class="subject-preview-body" id="subject-preview-body"></div>
+    <div class="subject-preview-footer">
+      <a href="#" id="subject-preview-link" class="btn btn-secondary btn-sm">Go to heading &rarr;</a>
+    </div>
+  </aside>
+
+</div>{# .subject-detail-layout #}
+
+<script>
+function loadSubjectPreview(btn) {
+  const panel = document.getElementById('subject-preview-panel');
+  const body  = document.getElementById('subject-preview-body');
+  const title = document.getElementById('subject-preview-title');
+  const link  = document.getElementById('subject-preview-link');
+
+  title.textContent = btn.textContent.trim();
+  link.href         = btn.dataset.href;
+  body.innerHTML    = '<p class="preview-loading">Loading\u2026</p>';
+  panel.hidden      = false;
+
+  fetch(btn.dataset.preview)
+    .then(r => r.text())
+    .then(html => { body.innerHTML = html; })
+    .catch(() => { body.innerHTML = '<p class="preview-error">Could not load preview.</p>'; });
+}
+
+function closeSubjectPreview() {
+  document.getElementById('subject-preview-panel').hidden = true;
+}
+</script>
+{% endblock %}

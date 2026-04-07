@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+{% block title %}Home Library Catalog{% endblock %}
+
+{% block content %}
+<h1>Home Library Catalog</h1>
+
+{% if libraries %}
+  <div class="library-grid">
+    {% for lib in libraries %}
+    <div class="library-card">
+      <a class="library-card-link" href="{{ url_for('library', library_id=lib.id) }}">
+        <div class="lib-name">
+          {{ lib.name }}
+          {% if lib.is_primary %}<span class="lib-badge lib-badge-primary">Primary</span>{% endif %}
+          {% if lib.is_storage %}<span class="lib-badge lib-badge-storage">Storage</span>{% endif %}
+        </div>
+        <div class="lib-count">
+          {{ lib.entry_count }} {{ 'entry' if lib.entry_count == 1 else 'entries' }}
+        </div>
+      </a>
+      <div class="library-card-footer">
+        <a href="{{ url_for('library', library_id=lib.id) }}" class="btn btn-secondary btn-sm">Open</a>
+        <a href="{{ url_for('library', library_id=lib.id) }}?settings=1"
+           class="btn btn-secondary btn-sm">Edit</a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <p class="empty-state">
+    No libraries yet. Create one to start cataloguing your collection.
+  </p>
+{% endif %}
+{% endblock %}

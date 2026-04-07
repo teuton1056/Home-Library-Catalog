@@ -1,0 +1,239 @@
+{% extends 'base.html' %}
+{% block title %}{{ 'Edit' if editing else 'New' }} Subject Heading — Home Library Catalog{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <a href="{{ url_for('subject_detail', heading_id=heading.id) if editing else url_for('subjects') }}" class="back-link">
+    &larr; {{ heading.heading if editing else 'Subject Headings' }}
+  </a>
+  <h1>{{ 'Edit' if editing else 'New' }} Subject Heading</h1>
+</div>
+
+<form method="post" class="entry-form" id="subject-form">
+
+  <div class="form-group">
+    <label for="heading-text">Heading</label>
+    <input id="heading-text" name="heading" type="text" required
+           value="{{ heading.heading if editing else '' }}"
+           placeholder="e.g. Manitoba---History">
+  </div>
+
+  <div class="form-group">
+    <label for="heading-type">Type</label>
+    <select id="heading-type" name="type">
+      <option value="">— unspecified —</option>
+      {% for key, label in heading_types %}
+      <option value="{{ key }}"{{ ' selected' if editing and heading and heading.type == key else '' }}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="form-group">
+    <label for="scope-note">Scope Note</label>
+    <textarea id="scope-note" name="scope_note" rows="3"
+              placeholder="Optional description of scope and usage">{{ heading.scope_note if editing and heading and heading.scope_note else '' }}</textarea>
+  </div>
+
+  {# ── Relations editor ──────────────────────────────────────────────────── #}
+  <div class="form-section">
+    <h2 class="form-section-title">Relations</h2>
+    <p class="field-hint">
+      BT/NT and RT are automatically reciprocated. USE/UF are automatically reciprocated.
+      SA and SE are one-directional. Entering a non-existent heading will create it on save.
+      PARENT/CHILD links are derived automatically from the heading name (subdivision separator
+      <code>---</code> or <code>—</code>) and cannot be set here.
+    </p>
+    <div id="relations-container">
+      {# Existing relations (edit mode) — skip PARENT/CHILD; they are auto-managed #}
+      {% if editing and relations %}
+        {% set editable = relations | selectattr('relation_type', 'ne', 'PARENT') | selectattr('relation_type', 'ne', 'CHILD') | list %}
+        {% for rel in editable %}
+        <div class="relation-row" data-index="{{ loop.index0 }}">
+          <select name="rel_type_{{ loop.index0 }}" class="relation-type-select">
+            {% for rkey, rlabel in relation_types %}
+            <option value="{{ rkey }}"{{ ' selected' if rel.relation_type == rkey else '' }}>{{ rkey }} — {{ rlabel }}</option>
+            {% endfor %}
+          </select>
+          <div class="relation-target-wrapper">
+            <input type="text" name="rel_target_{{ loop.index0 }}"
+                   class="relation-target-input"
+                   value="{{ rel.target_heading }}"
+                   autocomplete="off"
+                   placeholder="Heading text">
+            <ul class="subject-autocomplete relation-ac-list" hidden></ul>
+            <span class="relation-status" id="rel-status-{{ loop.index0 }}"></span>
+          </div>
+          <button type="button" class="btn btn-danger btn-sm relation-remove-btn">Remove</button>
+        </div>
+        {% endfor %}
+      {% endif %}
+    </div>
+    <button type="button" class="btn btn-secondary btn-sm" id="add-relation-btn">+ Add Relation</button>
+  </div>
+
+  <div class="form-actions">
+    <button type="submit" class="btn btn-primary">{{ 'Save Changes' if editing else 'Create Heading' }}</button>
+    <a href="{{ url_for('subject_detail', heading_id=heading.id) if editing else url_for('subjects') }}"
+       class="btn btn-secondary">Cancel</a>
+  </div>
+
+</form>
+
+<script>
+(function () {
+  const container = document.getElementById('relations-container');
+  let rowCount = container.querySelectorAll('.relation-row').length;
+
+  const relationTypes = [
+    {% for rkey, rlabel in relation_types %}
+    {value: '{{ rkey }}', label: '{{ rkey }} \u2014 {{ rlabel }}'},
+    {% endfor %}
+  ];
+
+  const reciprocalNote = {
+    'BT':  'Will also add NT on the other heading.',
+    'NT':  'Will also add BT on the other heading.',
+    'RT':  'Will also add RT on the other heading.',
+    'USE': 'Will also add UF on the other heading.',
+    'UF':  'Will also add USE on the other heading.',
+  };
+
+  function buildSelect(name, selectedValue) {
+    const sel = document.createElement('select');
+    sel.name      = name;
+    sel.className = 'relation-type-select';
+    relationTypes.forEach(function (rt) {
+      const opt = document.createElement('option');
+      opt.value    = rt.value;
+      opt.textContent = rt.label;
+      if (rt.value === selectedValue) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    return sel;
+  }
+
+  function attachAc(row, idx) {
+    const input  = row.querySelector('.relation-target-input');
+    const acList = row.querySelector('.relation-ac-list');
+    const status = row.querySelector('.relation-status');
+    const selType = row.querySelector('.relation-type-select');
+
+    function hideAc() { acList.hidden = true; acList.innerHTML = ''; }
+
+    function updateStatus() {
+      const rt = selType ? selType.value : '';
+      status.textContent = reciprocalNote[rt] || '';
+    }
+
+    if (selType) selType.addEventListener('change', updateStatus);
+    updateStatus();
+
+    let timer = null;
+    input.addEventListener('input', function () {
+      clearTimeout(timer);
+      const q = input.value.trim();
+      if (!q) { hideAc(); return; }
+      timer = setTimeout(function () {
+        fetch('/api/subjects?q=' + encodeURIComponent(q))
+          .then(r => r.json())
+          .then(function (data) {
+            acList.innerHTML = '';
+            data.forEach(function (item) {
+              const li = document.createElement('li');
+              li.className = 'subject-ac-item';
+              let html = item.heading;
+              if (item.preferred) html += ' <span class="ac-redirect-note">(USE: ' + item.preferred + ')</span>';
+              li.innerHTML = html;
+              li.addEventListener('mousedown', function (e) {
+                e.preventDefault();
+                input.value = item.heading;
+                hideAc();
+              });
+              acList.appendChild(li);
+            });
+            const exactMatch = data.some(d => d.heading.toLowerCase() === q.toLowerCase());
+            if (!exactMatch) {
+              const li = document.createElement('li');
+              li.className = 'subject-ac-item subject-ac-new';
+              li.textContent = 'Will create \u201c' + q + '\u201d';
+              acList.appendChild(li);
+            }
+            acList.hidden = acList.children.length === 0;
+          })
+          .catch(function () { hideAc(); });
+      }, 180);
+    });
+
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') { hideAc(); }
+      else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const items = Array.from(acList.querySelectorAll('.subject-ac-item'));
+        const idx2  = items.findIndex(i => i.classList.contains('highlighted'));
+        items.forEach(i => i.classList.remove('highlighted'));
+        if (idx2 < items.length - 1) items[idx2 + 1].classList.add('highlighted');
+        else if (items.length) items[0].classList.add('highlighted');
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const items = Array.from(acList.querySelectorAll('.subject-ac-item'));
+        const idx2  = items.findIndex(i => i.classList.contains('highlighted'));
+        items.forEach(i => i.classList.remove('highlighted'));
+        if (idx2 > 0) items[idx2 - 1].classList.add('highlighted');
+        else if (items.length) items[items.length - 1].classList.add('highlighted');
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        const hi = acList.querySelector('.subject-ac-item.highlighted');
+        if (hi && !hi.classList.contains('subject-ac-new')) {
+          hi.dispatchEvent(new MouseEvent('mousedown'));
+        }
+      }
+    });
+    input.addEventListener('blur', function () { setTimeout(hideAc, 150); });
+  }
+
+  // Wire up existing rows
+  container.querySelectorAll('.relation-row').forEach(function (row, i) {
+    row.querySelector('.relation-remove-btn').addEventListener('click', function () { row.remove(); });
+    attachAc(row, i);
+  });
+
+  document.getElementById('add-relation-btn').addEventListener('click', function () {
+    const idx = rowCount++;
+    const row = document.createElement('div');
+    row.className     = 'relation-row';
+    row.dataset.index = idx;
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'relation-target-wrapper';
+    const inp = document.createElement('input');
+    inp.type          = 'text';
+    inp.name          = 'rel_target_' + idx;
+    inp.className     = 'relation-target-input';
+    inp.autocomplete  = 'off';
+    inp.placeholder   = 'Heading text';
+    const ac = document.createElement('ul');
+    ac.className = 'subject-autocomplete relation-ac-list';
+    ac.hidden    = true;
+    const st = document.createElement('span');
+    st.className = 'relation-status';
+    st.id        = 'rel-status-' + idx;
+    wrapper.appendChild(inp);
+    wrapper.appendChild(ac);
+    wrapper.appendChild(st);
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type      = 'button';
+    removeBtn.className = 'btn btn-danger btn-sm relation-remove-btn';
+    removeBtn.textContent = 'Remove';
+    removeBtn.addEventListener('click', function () { row.remove(); });
+
+    row.appendChild(buildSelect('rel_type_' + idx, 'BT'));
+    row.appendChild(wrapper);
+    row.appendChild(removeBtn);
+    container.appendChild(row);
+    attachAc(row, idx);
+    inp.focus();
+  });
+})();
+</script>
+{% endblock %}

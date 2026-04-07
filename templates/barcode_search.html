@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% block title %}Barcode Scan — Home Library Catalog{% endblock %}
+
+{% block content %}
+<div class="barcode-page">
+  <h1 class="barcode-heading">Barcode Scan</h1>
+  <p class="barcode-hint">Scan a barcode or type a number and press Enter.</p>
+
+  <form class="barcode-form" method="get" action="{{ url_for('barcode_search') }}"
+        autocomplete="off">
+    <input id="barcode-input" name="q" type="text"
+           class="barcode-input" autofocus
+           placeholder="Scan barcode…"
+           spellcheck="false">
+  </form>
+
+  {% if not_found %}
+  <p class="barcode-not-found">
+    No volume found with barcode <strong>{{ query }}</strong>.
+  </p>
+  {% endif %}
+
+  <p class="barcode-back">
+    <a href="{{ url_for('search') }}">Full-text search</a>
+  </p>
+</div>
+
+<script>
+/* Ensure focus is restored after a "not found" page reload.
+   autofocus handles first load; this handles subsequent loads in some browsers. */
+document.getElementById('barcode-input').focus();
+</script>
+{% endblock %}

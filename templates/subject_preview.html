@@ -1,0 +1,55 @@
+{# Standalone fragment returned by /subject/<id>/preview — no base layout #}
+{% if heading.scope_note %}
+<p class="preview-scope-note">{{ heading.scope_note }}</p>
+{% endif %}
+
+{% if heading.type %}
+<p class="preview-type">
+  <span class="subject-type-badge subject-type-{{ heading.type }}">{{ heading_type_labels.get(heading.type, heading.type) }}</span>
+</p>
+{% endif %}
+
+{% set use_rels = relations | selectattr('relation_type', 'equalto', 'USE') | list %}
+{% if use_rels %}
+<p class="preview-nonpreferred">
+  <strong>Non-preferred.</strong> Use:
+  {% for rel in use_rels %}
+    <a href="{{ url_for('subject_detail', heading_id=rel.target_id) }}">{{ rel.target_heading }}</a>{% if not loop.last %}, {% endif %}
+  {% endfor %}
+</p>
+{% endif %}
+
+{% set rel_order = ['PARENT','CHILD','BT','NT','RT','SA','SE','UF'] %}
+{% set grouped = {} %}
+{% for rel in relations %}
+  {% if rel.relation_type not in grouped %}{% set _ = grouped.update({rel.relation_type: []}) %}{% endif %}
+  {% set _ = grouped[rel.relation_type].append(rel) %}
+{% endfor %}
+
+{% if relations %}
+<div class="preview-relations">
+  {% for rtype in rel_order %}
+    {% if rtype in grouped %}
+    <div class="preview-relation-row">
+      <span class="relation-type-label">{{ relation_type_labels[rtype] }}:</span>
+      {% for rel in grouped[rtype] %}
+        <a href="{{ url_for('subject_detail', heading_id=rel.target_id) }}">{{ rel.target_heading }}</a>{% if not loop.last %}, {% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if entries %}
+<div class="preview-entries">
+  <p class="preview-entries-label">Some entries:</p>
+  <ul>
+    {% for e in entries %}
+    <li><a href="{{ url_for('entry_detail', entry_id=e.id) }}">{{ e.title or '(Untitled)' }}</a>{% if e.first_author %} — {{ e.first_author }}{% endif %}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% else %}
+<p class="preview-empty">No entries tagged with this heading.</p>
+{% endif %}

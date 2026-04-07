@@ -1,0 +1,124 @@
+{% extends 'base.html' %}
+{% block title %}Import from LibraryThing — Home Library Catalog{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+  <a href="{{ url_for('index') }}">Libraries</a> &rsaquo; Import from LibraryThing
+</div>
+
+<h1>Import from LibraryThing</h1>
+
+<div class="card import-summary">
+  <h2>File summary</h2>
+  <table class="meta-table">
+    <tr><th>Total entries</th><td>{{ total }}</td></tr>
+    {% for type_key, count in type_counts.items() %}
+    <tr>
+      <th>{{ type_labels.get(type_key, type_key) }}</th>
+      <td>{{ count }}</td>
+    </tr>
+    {% endfor %}
+    <tr>
+      <th>Single-volume <span class="hint">(volume auto-created with a barcode)</span></th>
+      <td>{{ single_vol_count }}</td>
+    </tr>
+    <tr>
+      <th>Multi-volume books <span class="hint">(volumes auto-created with barcodes)</span></th>
+      <td>{{ multi_vol_books | length }}</td>
+    </tr>
+    <tr>
+      <th>Multi-volume non-books <span class="hint warn">(flagged for manual volume entry)</span></th>
+      <td>{{ multi_vol_other | length }}</td>
+    </tr>
+  </table>
+</div>
+
+{% if multi_vol_books %}
+<div class="card">
+  <h2>Multi-volume books <span class="hint">({{ multi_vol_books | length }} entries — volumes will be created automatically)</span></h2>
+  <table class="vol-table">
+    <thead>
+      <tr>
+        <th>Title</th>
+        <th>Vols.</th>
+        <th>Shelfmarks to be created</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in multi_vol_books %}
+      <tr>
+        <td>{{ e.title or '(Untitled)' }}</td>
+        <td>{{ e.volumes_count }}</td>
+        <td>{{ e.volumes_count }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if multi_vol_other %}
+<div class="card">
+  <h2>
+    <span class="warn-text">&#9888;</span>
+    Multi-volume non-books <span class="hint warn">({{ multi_vol_other | length }} entries — manual volume entry required)</span>
+  </h2>
+  <p class="import-note">
+    These entries will be imported as catalog records but volumes will
+    <strong>not</strong> be created automatically. You will need to add volumes
+    manually after import.
+  </p>
+  <table class="vol-table">
+    <thead>
+      <tr>
+        <th>Title</th>
+        <th>Type</th>
+        <th>Vols.</th>
+        <th>Vols.</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in multi_vol_other %}
+      <tr>
+        <td>{{ e.title or '(Untitled)' }}</td>
+        <td>{{ type_labels.get(e.type, e.type) }}</td>
+        <td>{{ e.volumes_count }}</td>
+        <td>{{ e.volumes_count }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<div class="card import-form-card">
+  <h2>Select target library</h2>
+
+  {% if not libraries %}
+    <p class="empty-state">
+      No libraries exist yet.
+      <a href="{{ url_for('new_library') }}">Create one first.</a>
+    </p>
+  {% else %}
+    <form method="post">
+      <div class="form-group">
+        <label for="library_id">Import into</label>
+        <select id="library_id" name="library_id" required>
+          <option value="">— select a library —</option>
+          {% for lib in libraries %}
+          <option value="{{ lib.id }}">{{ lib.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <p class="import-warn">
+        This will add <strong>{{ total }}</strong> entries to the selected library.
+        Running the import more than once on the same library will create duplicates.
+      </p>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Import {{ total }} entries</button>
+        <a href="{{ url_for('index') }}" class="btn btn-secondary">Cancel</a>
+      </div>
+    </form>
+  {% endif %}
+</div>
+{% endblock %}

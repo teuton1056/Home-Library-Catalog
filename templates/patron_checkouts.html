@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+{% block title %}Checkout History — {{ patron.name }} — Home Library Catalog{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Checkout History</h1>
+  <p class="page-subtitle">{{ patron.name }} &nbsp;·&nbsp; <span class="mono">{{ patron.patron_number }}</span></p>
+  {% if current_patron and current_patron.role == 'owner' %}
+  <a href="{{ url_for('manage') }}" class="btn btn-secondary btn-sm">← Manage</a>
+  {% endif %}
+</div>
+
+{% if history %}
+<table class="data-table">
+  <thead>
+    <tr>
+      <th>Title</th>
+      <th>Barcode</th>
+      <th>Library</th>
+      <th>Checked Out</th>
+      <th>Returned</th>
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in history %}
+    <tr class="{{ 'row-active' if row.returned_at is none else '' }}">
+      <td><a href="{{ url_for('entry_detail', entry_id=row.entry_id) }}">{{ row.title }}</a>
+        {% if row.volume_number %}<span class="vol-num">vol. {{ row.volume_number }}</span>{% endif %}
+      </td>
+      <td class="mono">{{ row.barcode or '—' }}</td>
+      <td>{{ row.library_name or '—' }}</td>
+      <td class="date-cell">{{ row.checked_out_at }}</td>
+      <td class="date-cell">{{ row.returned_at or '—' }}</td>
+      <td>
+        {% if row.returned_at is none %}
+        <span class="badge badge-out">Out</span>
+        {% else %}
+        <span class="badge badge-in">Returned</span>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty-state">No checkout history for this patron.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,969 @@
+{% extends 'base.html' %}
+{% block title %}
+  {%- if mode == 'new' %}New Entry — LOCUS Cataloguing
+  {%- elif mode == 'classify' %}Classify: {{ entry.title or '(Untitled)' }} — LOCUS Cataloguing
+  {%- else %}Batch Classify — LOCUS Cataloguing
+  {%- endif %} — Home Library Catalog
+{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+  <a href="{{ url_for('manage') }}">Library Management</a> &rsaquo;
+  {% if mode == 'new' %}
+    New Entry
+  {% elif mode == 'classify' %}
+    <a href="{{ url_for('entry_detail', entry_id=entry.id) }}">{{ entry.title or '(Untitled)' }}</a> &rsaquo; Classify
+  {% else %}
+    Batch Classify
+  {% endif %}
+</div>
+
+{% if mode == 'batch' %}
+<div class="cat-batch-header">
+  <span class="cat-batch-progress">
+    {%- if in_deferred_phase -%}
+      Deferred entries &mdash; {{ queue_remaining }} remaining
+    {%- else -%}
+      {{ queue_remaining }} unclassified remaining
+      {%- if queue_deferred %} <span class="cat-batch-deferred">({{ queue_deferred }} deferred)</span>{% endif %}
+    {%- endif -%}
+  </span>
+  <div class="cat-batch-actions">
+    {% if queue_remaining > 1 %}
+    <a href="{{ url_for('cataloguing_batch', skip=entry.id) }}" class="btn btn-secondary btn-sm">Skip</a>
+    {% else %}
+    <span class="btn btn-secondary btn-sm cat-btn-disabled">Skip</span>
+    {% endif %}
+    <a href="{{ url_for('manage') }}" class="btn btn-secondary btn-sm">Exit</a>
+  </div>
+</div>
+{% endif %}
+
+<div class="page-header">
+  <h1>
+    {% if mode == 'new' %}New Entry
+    {% elif mode == 'classify' %}Classify: {{ entry.title or '(Untitled)' }}
+    {% else %}{{ entry.title or '(Untitled)' }}
+    {% endif %}
+  </h1>
+</div>
+
+<div id="cataloguing-tool"
+     data-mode="{{ mode }}"
+     data-entry-id="{{ entry.id if entry else '' }}"
+     data-entry-author="{{ entry.author if entry else '' }}"
+     data-entry-year="{{ entry.year if entry else '' }}"
+     data-entry-title="{{ entry.title if entry else '' }}"
+     data-entry-publisher="{{ entry.publisher if entry else '' }}"
+     data-entry-isbn="{{ entry.isbn if entry else '' }}"
+     data-entry-locus-code="{{ entry.locus_code if entry else '' }}"
+     data-queue-pos="{{ queue_pos or '' }}"
+     data-queue-total="{{ queue_total or '' }}"
+     data-existing-volumes='{{ existing_volumes | default([]) | tojson }}'>
+
+  <!-- ── Section 1: Bibliographic Metadata ─────────────────────────────── -->
+  <section class="cat-section" id="cat-section-metadata">
+    <h2 class="cat-section-title">Bibliographic Metadata</h2>
+
+    {% if mode in ('classify', 'batch') %}
+    <div class="cat-metadata-readonly" id="cat-meta-display">
+      <div class="cat-meta-grid">
+        <div class="cat-meta-field">
+          <span class="cat-meta-label">Author</span>
+          <span class="cat-meta-value" id="disp-author">{{ entry.author or '—' }}</span>
+        </div>
+        <div class="cat-meta-field">
+          <span class="cat-meta-label">Year</span>
+          <span class="cat-meta-value" id="disp-year">{{ entry.year or '—' }}</span>
+        </div>
+        <div class="cat-meta-field cat-meta-wide">
+          <span class="cat-meta-label">Title</span>
+          <span class="cat-meta-value" id="disp-title">{{ entry.title or '—' }}</span>
+        </div>
+        <div class="cat-meta-field cat-meta-wide">
+          <span class="cat-meta-label">Publisher</span>
+          <span class="cat-meta-value" id="disp-publisher">{{ entry.publisher or '—' }}</span>
+        </div>
+      </div>
+    </div>
+    {% else %}
+    {# Mode A — editable metadata + ISBN lookup #}
+    <div class="cat-isbn-row">
+      <input id="cat-isbn" type="text" placeholder="ISBN" class="cat-isbn-input">
+      <button type="button" id="cat-isbn-lookup" class="btn btn-secondary">Lookup</button>
+      <span id="cat-isbn-status" class="cat-isbn-status"></span>
+    </div>
+    <div class="cat-meta-grid" id="cat-meta-edit-grid">
+      <div class="cat-meta-field">
+        <label class="cat-meta-label" for="cat-author">Author</label>
+        <input id="cat-author" type="text" class="cat-meta-input" placeholder="Surname, Forename">
+      </div>
+      <div class="cat-meta-field">
+        <label class="cat-meta-label" for="cat-year">Year</label>
+        <input id="cat-year" type="text" class="cat-meta-input" placeholder="YYYY">
+      </div>
+      <div class="cat-meta-field cat-meta-wide">
+        <label class="cat-meta-label" for="cat-title">Title</label>
+        <input id="cat-title" type="text" class="cat-meta-input">
+      </div>
+      <div class="cat-meta-field cat-meta-wide">
+        <label class="cat-meta-label" for="cat-publisher">Publisher</label>
+        <input id="cat-publisher" type="text" class="cat-meta-input">
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="cat-workmark-preview" id="cat-workmark-preview">
+      <span class="cat-workmark-label">Work mark preview:</span>
+      <span class="cat-workmark-value" id="cat-workmark-live">—</span>
+    </div>
+  </section>
+
+  <hr class="cat-rule">
+
+  <!-- ── Section 2: Shelfmark Builder ──────────────────────────────────── -->
+  <section class="cat-section" id="cat-section-shelfmark">
+    <h2 class="cat-section-title">Shelfmark</h2>
+    <div class="cat-shelfmark-row">
+      <div class="cat-shelfmark-bar" id="cat-shelfmark-bar">
+        <div class="cat-seg-wrap" id="wrap-region">
+          <input id="seg-region" class="cat-seg" type="text"
+                 placeholder="Region" autocomplete="off" spellcheck="false">
+          <ul class="cat-dropdown" id="dd-region" hidden></ul>
+        </div>
+        <span class="cat-sep">-</span>
+        <div class="cat-seg-wrap" id="wrap-period">
+          <input id="seg-period" class="cat-seg cat-seg-sm" type="text"
+                 placeholder="P" autocomplete="off" spellcheck="false">
+          <ul class="cat-dropdown" id="dd-period" hidden></ul>
+        </div>
+        <span class="cat-sep">.</span>
+        <div class="cat-seg-wrap" id="wrap-domain">
+          <input id="seg-domain" class="cat-seg" type="text"
+                 placeholder="Domain" autocomplete="off" spellcheck="false">
+          <ul class="cat-dropdown" id="dd-domain" hidden></ul>
+        </div>
+        <span class="cat-sep cat-sep-subcode" id="sep-subcode" hidden>.</span>
+        <div class="cat-seg-wrap" id="wrap-subcode" hidden>
+          <input id="seg-subcode" class="cat-seg" type="text"
+                 placeholder="Subcode" autocomplete="off" spellcheck="false"
+                 disabled>
+          <ul class="cat-dropdown" id="dd-subcode" hidden></ul>
+        </div>
+        <span class="cat-sep cat-sep-optional">:</span>
+        <div class="cat-seg-wrap" id="wrap-minor">
+          <input id="seg-minor" class="cat-seg cat-seg-xs" type="text"
+                 placeholder="m" autocomplete="off" spellcheck="false"
+                 disabled>
+          <ul class="cat-dropdown" id="dd-minor" hidden></ul>
+        </div>
+      </div>
+
+      <div class="cat-shelfmark-assembled">
+        <span class="cat-assembled-label">Assembled:</span>
+        <span class="cat-assembled-value" id="cat-assembled">—</span>
+      </div>
+    </div>
+
+    <div class="cat-info-panel" id="cat-info-panel">
+      <div class="cat-resolved-labels" id="cat-resolved">
+        <span class="cat-resolved-placeholder">Fill in segments above to see resolved labels.</span>
+      </div>
+      <div class="cat-ruling-chips" id="cat-ruling-chips"></div>
+      <div class="cat-ruling-expanded" id="cat-ruling-expanded" hidden></div>
+    </div>
+  </section>
+
+  <hr class="cat-rule">
+
+  <!-- ── Section 3: Work Mark & Collision Detection ────────────────────── -->
+  <section class="cat-section" id="cat-section-workmark">
+    <h2 class="cat-section-title">Call Number</h2>
+    <div class="cat-callnum-grid">
+      <div class="cat-callnum-row">
+        <span class="cat-callnum-label">Shelfmark</span>
+        <span class="cat-callnum-value" id="out-shelfmark">—</span>
+      </div>
+      <div class="cat-callnum-row">
+        <span class="cat-callnum-label">Work mark</span>
+        <span class="cat-callnum-value" id="out-workmark">—</span>
+      </div>
+      <div class="cat-callnum-row cat-callnum-full">
+        <span class="cat-callnum-label">Call number</span>
+        <span class="cat-callnum-value" id="out-callnumber">—</span>
+      </div>
+    </div>
+    <div class="cat-collision-status" id="cat-collision-status"></div>
+  </section>
+
+  <hr class="cat-rule">
+
+  <!-- ── Section 4: Volume Manager ─────────────────────────────────────── -->
+  <section class="cat-section" id="cat-section-volumes">
+    <div class="cat-volumes-header">
+      <h2 class="cat-section-title">Volumes</h2>
+      <label class="cat-toggle-label">
+        <input type="checkbox" id="cat-multivol-toggle"> Multi-volume work
+      </label>
+    </div>
+    <div id="cat-vol-list"></div>
+    <div class="cat-vol-actions">
+      <button type="button" id="cat-add-vol" class="btn btn-secondary btn-sm">+ Add Volume</button>
+      <button type="button" id="cat-mark-all-vols" class="btn btn-secondary btn-sm" hidden>
+        Mark all as volumes
+      </button>
+    </div>
+  </section>
+
+  <hr class="cat-rule">
+
+  <!-- ── Save ──────────────────────────────────────────────────────────── -->
+  <div class="cat-save-row">
+    <button type="button" id="cat-save" class="btn btn-primary">
+      Save &amp; Continue <kbd>Ctrl+Enter</kbd>
+    </button>
+    <span class="cat-save-status" id="cat-save-status"></span>
+  </div>
+
+</div>{# #cataloguing-tool #}
+
+<script>
+// ── Classification data (loaded once) ────────────────────────────────────
+let classData = null;
+let nextBarcode = null;
+
+async function init() {
+  const [cdResp, bcResp] = await Promise.all([
+    fetch('/api/classification/data'),
+    fetch('/api/catalogue/barcode-next'),
+  ]);
+  classData   = await cdResp.json();
+  nextBarcode = (await bcResp.json()).next;
+
+  // Pre-populate volumes from existing records (Modes B and C)
+  const existing = JSON.parse(tool.dataset.existingVolumes || '[]');
+  if (existing.length) volumes = existing;
+
+  renderVolList();
+  bindMetaInputs();
+  bindShelfmarkBar();
+  bindSave();
+  updateWorkmarkPreview();
+  updateSubcodeState();
+}
+
+// ── Tool dataset ─────────────────────────────────────────────────────────
+const tool  = document.getElementById('cataloguing-tool');
+const MODE  = tool.dataset.mode;
+const ENTRY_ID = tool.dataset.entryId || null;
+
+// ── Work mark computation ─────────────────────────────────────────────────
+function computeWorkmark(author, year, domain) {
+  // Journal/serial (domain starts with '06' or is '6') → abbreviation only
+  const dom = (domain || '').trim();
+  const isSerial = dom === '06' || dom === '6';
+
+  const yr  = (year  || '').trim();
+  const auth = (author || '').trim();
+  const title = tool.dataset.entryTitle || '';
+
+  let trunc;
+  if (auth) {
+    // First three letters of first word of author field, uppercased
+    const firstWord = auth.replace(/^[^A-Za-z]*/, '').replace(/,.*/, '').trim();
+    trunc = firstWord.slice(0, 3).toUpperCase();
+  } else {
+    // Title truncation: first three letters of first significant word
+    const firstWord = title.replace(/^(The|A|An)\s+/i, '').trim();
+    trunc = firstWord.slice(0, 3).toUpperCase();
+  }
+
+  if (isSerial) return trunc || '???';
+  const datePart = yr || 'n.d.';
+  return trunc ? `${datePart}.${trunc}` : datePart;
+}
+
+function getMetaValues() {
+  if (MODE === 'new') {
+    return {
+      author:    document.getElementById('cat-author')?.value    || '',
+      year:      document.getElementById('cat-year')?.value      || '',
+      title:     document.getElementById('cat-title')?.value     || '',
+      publisher: document.getElementById('cat-publisher')?.value || '',
+    };
+  }
+  return {
+    author:    tool.dataset.entryAuthor    || '',
+    year:      tool.dataset.entryYear      || '',
+    title:     tool.dataset.entryTitle     || '',
+    publisher: tool.dataset.entryPublisher || '',
+  };
+}
+
+function updateWorkmarkPreview() {
+  const { author, year } = getMetaValues();
+  const dom = document.getElementById('seg-domain')?.value || '';
+  const wm  = computeWorkmark(author, year, dom);
+  document.getElementById('cat-workmark-live').textContent = wm || '—';
+  updateCallnumber();
+}
+
+function bindMetaInputs() {
+  if (MODE !== 'new') return;
+  ['cat-author','cat-year','cat-title','cat-publisher'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input', updateWorkmarkPreview);
+  });
+  document.getElementById('cat-isbn-lookup')?.addEventListener('click', doIsbnLookup);
+}
+
+// ── ISBN lookup (Phase 4 stub — shows placeholder) ───────────────────────
+async function doIsbnLookup() {
+  const isbn = document.getElementById('cat-isbn').value.trim().replace(/[-\s]/g, '');
+  const status = document.getElementById('cat-isbn-status');
+  if (!isbn) return;
+  status.textContent = 'Looking up…';
+  try {
+    const resp = await fetch('/api/catalogue/isbn-lookup', {
+      method:  'POST',
+      headers: {'Content-Type': 'application/json'},
+      body:    JSON.stringify({isbn}),
+    });
+    if (!resp.ok) throw new Error('Not found');
+    const data = await resp.json();
+    if (data.author)    document.getElementById('cat-author').value    = data.author;
+    if (data.year)      document.getElementById('cat-year').value      = data.year;
+    if (data.title)     document.getElementById('cat-title').value     = data.title;
+    if (data.publisher) document.getElementById('cat-publisher').value = data.publisher;
+    status.textContent = 'Found.';
+    updateWorkmarkPreview();
+  } catch {
+    status.textContent = 'Not found.';
+  }
+}
+
+// ── Shelfmark bar ─────────────────────────────────────────────────────────
+const SEG_IDS   = ['region','period','domain','subcode','minor'];
+const SEP_CHARS = {region:'-', period:'.', domain:'.', subcode:':', minor:null};
+
+function getSegEl(name) { return document.getElementById(`seg-${name}`); }
+function getDdEl(name)  { return document.getElementById(`dd-${name}`);  }
+
+function bindShelfmarkBar() {
+  SEG_IDS.forEach((name, idx) => {
+    const inp = getSegEl(name);
+    if (!inp) return;
+
+    inp.addEventListener('input', () => {
+      populateDropdown(name);
+      if (name === 'region' || name === 'domain') updateSubcodeState();
+      updateAssembled();
+      updateWorkmarkPreview();
+      scheduleCollisionCheck();
+    });
+
+    inp.addEventListener('keydown', e => {
+      const dd = getDdEl(name);
+      if (!dd.hidden) {
+        if (e.key === 'ArrowDown') { e.preventDefault(); moveDdFocus(dd, 1); return; }
+        if (e.key === 'ArrowUp')   { e.preventDefault(); moveDdFocus(dd, -1); return; }
+        if (e.key === 'Enter' || e.key === 'Tab') {
+          const active = dd.querySelector('.cat-dd-active');
+          if (active) { e.preventDefault(); selectDdItem(name, active); return; }
+        }
+        if (e.key === 'Escape') { closeDd(name); return; }
+      }
+      // Separator advances focus
+      const sep = SEP_CHARS[name];
+      if (sep && e.key === sep && inp.value.trim()) {
+        e.preventDefault(); advanceFocus(idx); return;
+      }
+      if (e.key === 'Enter' && inp.value.trim()) {
+        e.preventDefault(); advanceFocus(idx); return;
+      }
+      // Backspace at start → go back
+      if (e.key === 'Backspace' && inp.selectionStart === 0 && inp.selectionEnd === 0 && idx > 0) {
+        e.preventDefault(); getSegEl(SEG_IDS[idx - 1]).focus();
+      }
+    });
+
+    inp.addEventListener('blur', () => setTimeout(() => closeDd(name), 150));
+    inp.addEventListener('focus', () => populateDropdown(name));
+  });
+}
+
+function advanceFocus(currentIdx) {
+  for (let i = currentIdx + 1; i < SEG_IDS.length; i++) {
+    const el = getSegEl(SEG_IDS[i]);
+    if (el && !el.disabled) { el.focus(); return; }
+  }
+}
+
+// ── Dropdown population ───────────────────────────────────────────────────
+function closeDd(name) {
+  const dd = getDdEl(name);
+  dd.hidden = true;
+  dd.innerHTML = '';
+}
+
+function moveDdFocus(dd, dir) {
+  const items = Array.from(dd.querySelectorAll('li'));
+  const idx   = items.findIndex(li => li.classList.contains('cat-dd-active'));
+  items.forEach(li => li.classList.remove('cat-dd-active'));
+  const next  = items[Math.max(0, Math.min(items.length - 1, idx + dir))];
+  if (next) { next.classList.add('cat-dd-active'); next.scrollIntoView({block:'nearest'}); }
+}
+
+function selectDdItem(segName, li) {
+  getSegEl(segName).value = li.dataset.code;
+  closeDd(segName);
+  const idx = SEG_IDS.indexOf(segName);
+  updateAssembled();
+  updateWorkmarkPreview();
+  scheduleCollisionCheck();
+  // After selecting, update dependent segments
+  if (segName === 'region') { clearSeg('period'); clearSeg('subcode'); clearSeg('minor'); updateMinorState(); updateSubcodeState(); }
+  if (segName === 'period') { clearSeg('minor');  updateMinorState(); }
+  if (segName === 'domain') { clearSeg('subcode'); updateRulings(); updateSubcodeState(); }
+  advanceFocus(idx);
+}
+
+function clearSeg(name) {
+  getSegEl(name).value = '';
+  closeDd(name);
+}
+
+function populateDropdown(name) {
+  if (!classData) return;
+  const inp  = getSegEl(name);
+  const q    = inp.value.trim().toLowerCase();
+  const dd   = getDdEl(name);
+  const items = buildMatches(name, q);
+  if (!items.length) { closeDd(name); return; }
+  dd.innerHTML = items.map(({code, label}) =>
+    `<li data-code="${code}" tabindex="-1"><span class="cat-dd-code">${code}</span> <span class="cat-dd-label">${label}</span></li>`
+  ).join('');
+  dd.querySelectorAll('li').forEach(li => {
+    li.addEventListener('mousedown', e => { e.preventDefault(); selectDdItem(name, li); });
+  });
+  dd.hidden = false;
+}
+
+function buildMatches(name, q) {
+  if (!classData) return [];
+  if (name === 'region')  return matchRegions(q);
+  if (name === 'period')  return matchPeriods(q);
+  if (name === 'domain')  return matchDomains(q);
+  if (name === 'subcode') return matchSubcodes(q);
+  if (name === 'minor')   return matchMinor(q);
+  return [];
+}
+
+// Flatten region JSON into searchable list (fully recursive)
+function flattenRegions(obj) {
+  const results = [];
+  function recurse(o) {
+    for (const [k, v] of Object.entries(o)) {
+      if (k === 'Label' || k === 'Note' || k === 'Description') continue;
+      if (v && typeof v === 'object' && v.Label) {
+        results.push({code: k, label: v.Label});
+        recurse(v);
+      }
+    }
+  }
+  recurse(obj);
+  return results;
+}
+
+let _regionFlat = null;
+function getRegionFlat() {
+  if (!_regionFlat) _regionFlat = flattenRegions(classData.regions);
+  return _regionFlat;
+}
+
+function matchRegions(q) {
+  const flat = getRegionFlat();
+  if (!q) return flat.slice(0, 10);
+  return flat.filter(r =>
+    r.code.startsWith(q) || r.label.toLowerCase().includes(q)
+  ).slice(0, 12);
+}
+
+function matchPeriods(q) {
+  const regionCode = getSegEl('region').value.trim();
+  const regional   = classData.periods.regional?.[regionCode];
+
+  // Build single-period entries
+  let singles;
+  if (regional) {
+    singles = Object.entries(regional.major_periods).map(([k, v]) => ({
+      code: k,
+      label: v.Description ? `${v.Label} (${v.Description})` : v.Label,
+    }));
+  } else {
+    singles = Object.entries(classData.periods.universal).map(([k, v]) => ({
+      code: k, label: v.Label,
+    }));
+  }
+
+  // Build 2-digit range entries (e.g. "13" = periods 1–3)
+  const periodMap = Object.fromEntries(singles.map(e => [e.code, e.label]));
+  const ranges = [];
+  const codes  = singles.map(e => e.code).filter(c => c !== '0');
+  for (let i = 0; i < codes.length; i++) {
+    for (let j = i + 1; j < codes.length; j++) {
+      const rangeCode = codes[i] + codes[j];
+      ranges.push({
+        code:  rangeCode,
+        label: `${periodMap[codes[i]]} – ${periodMap[codes[j]]} (range)`,
+      });
+    }
+  }
+
+  const all = [...singles, ...ranges];
+  if (!q) return singles; // show only singles when empty; ranges appear on typing
+  return all.filter(e => e.code.startsWith(q) || e.label.toLowerCase().includes(q));
+}
+
+function flattenDomains(obj) {
+  const results = [];
+  function recurse(o) {
+    for (const [k, v] of Object.entries(o)) {
+      if (k === 'Label' || k === 'Note' || k === 'Description') continue;
+      if (v && typeof v === 'object' && v.Label) {
+        results.push({code: k, label: v.Label});
+        recurse(v);
+      }
+    }
+  }
+  recurse(obj);
+  return results;
+}
+
+let _domainFlat = null;
+function getDomainFlat() {
+  if (!_domainFlat) _domainFlat = flattenDomains(classData.domains);
+  return _domainFlat;
+}
+
+function matchDomains(q) {
+  const flat = getDomainFlat();
+  if (!q) return flat.slice(0, 10);
+  return flat.filter(d =>
+    d.code.startsWith(q) || d.label.toLowerCase().includes(q)
+  ).slice(0, 12);
+}
+
+// ── Regional domain subcodes ──────────────────────────────────────────────
+function getRegionalDomainData(regionCode, domainCode) {
+  if (!classData.regional_domains || !regionCode || !domainCode) return null;
+  // Match region: entry key must be a prefix of (or equal to) the current region code
+  const rdEntry = Object.entries(classData.regional_domains).find(([key]) =>
+    regionCode === key || regionCode.startsWith(key)
+  );
+  if (!rdEntry) return null;
+  const [, regionData] = rdEntry;
+  let domainData = regionData.regional_domains?.[domainCode];
+  // Resolve alias strings like "35": "=341"
+  if (typeof domainData === 'string' && domainData.startsWith('=')) {
+    const target = domainData.slice(1);
+    domainData = regionData.regional_domains?.[target];
+  }
+  return domainData || null;
+}
+
+// Returns the canonical domain code after resolving any alias (e.g. "35" → "341")
+function getResolvedDomain(regionCode, domainCode) {
+  const rdEntry = Object.entries(classData.regional_domains || {}).find(([key]) =>
+    regionCode === key || regionCode.startsWith(key)
+  );
+  if (!rdEntry) return domainCode;
+  const [, regionData] = rdEntry;
+  const raw = regionData.regional_domains?.[domainCode];
+  if (typeof raw === 'string' && raw.startsWith('=')) return raw.slice(1);
+  return domainCode;
+}
+
+function flattenRegionalDomains(obj) {
+  const results = [];
+  function recurse(o) {
+    for (const [k, v] of Object.entries(o)) {
+      if (k === 'Label' || k === 'Note' || k === 'Description') continue;
+      if (v && typeof v === 'object' && v.Label) {
+        results.push({code: k, label: v.Label});
+        recurse(v);
+      }
+    }
+  }
+  recurse(obj);
+  return results;
+}
+
+function matchSubcodes(q) {
+  const regionCode = getSegEl('region').value.trim();
+  const domainCode = getSegEl('domain').value.trim();
+  const domainData = getRegionalDomainData(regionCode, domainCode);
+  if (!domainData) return [];
+  // Strip the canonical domain prefix so the input holds only the suffix (e.g. "173" not "341.173")
+  const resolvedDomain = getResolvedDomain(regionCode, domainCode);
+  const prefix = resolvedDomain + '.';
+  const flat = flattenRegionalDomains(domainData);
+  const items = flat.map(s => ({
+    code:  s.code.startsWith(prefix) ? s.code.slice(prefix.length) : s.code,
+    label: s.label,
+  }));
+  if (!q) return items.slice(0, 10);
+  return items.filter(s =>
+    s.code.startsWith(q) || s.label.toLowerCase().includes(q)
+  ).slice(0, 12);
+}
+
+function updateSubcodeState() {
+  const regionCode  = getSegEl('region').value.trim();
+  const domainCode  = getSegEl('domain').value.trim();
+  const domainData  = getRegionalDomainData(regionCode, domainCode);
+  const hasSubcode  = !!domainData;
+  const subcodeInp  = getSegEl('subcode');
+  const subcodeWrap = document.getElementById('wrap-subcode');
+  const subcodeSep  = document.getElementById('sep-subcode');
+  subcodeInp.disabled = !hasSubcode;
+  subcodeWrap.hidden  = !hasSubcode;
+  subcodeSep.hidden   = !hasSubcode;
+  if (!hasSubcode) clearSeg('subcode');
+}
+
+function matchMinor(q) {
+  const regionCode = getSegEl('region').value.trim();
+  const periodCode = getSegEl('period').value.trim();
+  const regional   = classData.periods.regional?.[regionCode];
+  const minorTable = regional?.major_periods?.[periodCode]?.minor_periods;
+  if (!minorTable) return [];
+  return Object.entries(minorTable)
+    .map(([k, v]) => ({code: k, label: v.Description ? `${v.Label} (${v.Description})` : v.Label}))
+    .filter(e => !q || e.code.startsWith(q) || e.label.toLowerCase().includes(q));
+}
+
+function updateMinorState() {
+  const regionCode = getSegEl('region').value.trim();
+  const periodCode = getSegEl('period').value.trim();
+  const regional   = classData.periods.regional?.[regionCode];
+  const hasMinor   = !!(regional?.major_periods?.[periodCode]?.minor_periods);
+  const minorInp   = getSegEl('minor');
+  const sep        = document.querySelector('.cat-sep-optional');
+  minorInp.disabled = !hasMinor;
+  if (sep) sep.style.opacity = hasMinor ? '' : '0.3';
+  if (!hasMinor) clearSeg('minor');
+}
+
+// ── Assembled shelfmark ───────────────────────────────────────────────────
+function getAssembled() {
+  const r = getSegEl('region').value.trim();
+  const p = getSegEl('period').value.trim();
+  const d = getSegEl('domain').value.trim();
+  const sc = getSegEl('subcode').value.trim();
+  const m = getSegEl('minor').value.trim();
+  if (!r && !p && !d) return '';
+  let s = r || '?';
+  if (p) s += `-${p}`;
+  if (d) {
+    // sc holds only the suffix (e.g. "173"); reconstruct as domain.suffix (e.g. "341.173")
+    s += sc ? `.${d}.${sc}` : `.${d}`;
+  }
+  if (m) s += `:${m}`;
+  return s;
+}
+
+function updateAssembled() {
+  const val = getAssembled();
+  document.getElementById('cat-assembled').textContent = val || '—';
+  document.getElementById('out-shelfmark').textContent = val || '—';
+  updateResolvedLabels();
+  updateRulings();
+  updateCallnumber();
+}
+
+function updateCallnumber() {
+  const shelfmark = getAssembled();
+  const { author, year } = getMetaValues();
+  const dom = getSegEl('domain')?.value || '';
+  const wm  = computeWorkmark(author, year, dom);
+  document.getElementById('out-workmark').textContent   = wm || '—';
+  document.getElementById('cat-workmark-live').textContent = wm || '—';
+  if (shelfmark && wm) {
+    document.getElementById('out-callnumber').textContent = `${shelfmark} / ${wm}`;
+  } else {
+    document.getElementById('out-callnumber').textContent = '—';
+  }
+}
+
+// ── Resolved labels ───────────────────────────────────────────────────────
+function updateResolvedLabels() {
+  if (!classData) return;
+  const regionCode = getSegEl('region').value.trim();
+  const periodCode = getSegEl('period').value.trim();
+  const domainCode = getSegEl('domain').value.trim();
+  const minorCode  = getSegEl('minor').value.trim();
+  const lines = [];
+
+  if (regionCode) {
+    const flat  = getRegionFlat();
+    const match = flat.find(r => r.code === regionCode);
+    if (match) lines.push(`<span class="cat-res-seg">Region:</span> <span class="cat-res-code">${regionCode}</span> — ${match.label}`);
+  }
+  if (periodCode) {
+    const regional = classData.periods.regional?.[regionCode];
+    const getSingleLabel = code => {
+      if (regional) {
+        const mp = regional.major_periods?.[code];
+        return mp ? (mp.Description ? `${mp.Label} (${mp.Description})` : mp.Label) : null;
+      }
+      return classData.periods.universal?.[code]?.Label || null;
+    };
+    let label;
+    if (periodCode.length === 2 && !getSingleLabel(periodCode)) {
+      // Range code: split into two single-digit codes
+      const [a, b]  = periodCode.split('');
+      const labelA  = getSingleLabel(a) || a;
+      const labelB  = getSingleLabel(b) || b;
+      label = `${labelA} – ${labelB}`;
+    } else {
+      label = getSingleLabel(periodCode) || periodCode;
+    }
+    lines.push(`<span class="cat-res-seg">Period:</span> <span class="cat-res-code">${periodCode}</span> — ${label}`);
+  }
+  if (domainCode) {
+    const flat  = getDomainFlat();
+    const match = flat.find(d => d.code === domainCode);
+    if (match) lines.push(`<span class="cat-res-seg">Domain:</span> <span class="cat-res-code">${domainCode}</span> — ${match.label}`);
+    const subcodeCode = getSegEl('subcode').value.trim();
+    if (subcodeCode) {
+      const domainData = getRegionalDomainData(regionCode, domainCode);
+      if (domainData) {
+        const resolvedDomain = getResolvedDomain(regionCode, domainCode);
+        const fullCode = resolvedDomain + '.' + subcodeCode;
+        const subFlat = flattenRegionalDomains(domainData);
+        const subMatch = subFlat.find(s => s.code === fullCode);
+        if (subMatch) lines.push(`<span class="cat-res-seg">Subcode:</span> <span class="cat-res-code">${subcodeCode}</span> — ${subMatch.label}`);
+      }
+    }
+  }
+  if (minorCode) {
+    const regional   = classData.periods.regional?.[regionCode];
+    const minorTable = regional?.major_periods?.[periodCode]?.minor_periods;
+    const mp         = minorTable?.[minorCode];
+    if (mp) {
+      const label = mp.Description ? `${mp.Label} (${mp.Description})` : mp.Label;
+      lines.push(`<span class="cat-res-seg">Minor period:</span> <span class="cat-res-code">${minorCode}</span> — ${label}`);
+    }
+  }
+
+  const el = document.getElementById('cat-resolved');
+  if (lines.length) {
+    el.innerHTML = lines.map(l => `<div class="cat-res-line">${l}</div>`).join('');
+  } else {
+    el.innerHTML = '<span class="cat-resolved-placeholder">Fill in segments above to see resolved labels.</span>';
+  }
+}
+
+// ── Ruling chips ──────────────────────────────────────────────────────────
+let expandedRuling = null;
+
+function updateRulings() {
+  if (!classData) return;
+  const regionCode = getSegEl('region').value.trim();
+  const domainCode = getSegEl('domain').value.trim();
+  const major      = domainCode.slice(0, 1);
+  const rulings    = classData.rulings.filter(r => {
+    const regionMatch = !r.pertains_to_regions.length ||
+      r.pertains_to_regions.some(rc => regionCode.startsWith(rc) || rc.startsWith(regionCode));
+    const domainMatch = !r.pertains_to_domains.length ||
+      r.pertains_to_domains.some(dc => domainCode === dc || domainCode.startsWith(dc) || dc === major);
+    return regionMatch && domainMatch && (r.pertains_to_regions.length || r.pertains_to_domains.length);
+  });
+
+  const chipEl = document.getElementById('cat-ruling-chips');
+  const expEl  = document.getElementById('cat-ruling-expanded');
+
+  if (!rulings.length) {
+    chipEl.innerHTML = '';
+    expEl.hidden     = true;
+    expandedRuling   = null;
+    return;
+  }
+
+  chipEl.innerHTML = rulings.map(r =>
+    `<button type="button" class="cat-ruling-chip${expandedRuling === r.ruling_number ? ' active' : ''}"
+             data-rn="${r.ruling_number}">
+       Ruling ${r.ruling_number}: ${r.ruling_label}
+     </button>`
+  ).join('');
+
+  chipEl.querySelectorAll('.cat-ruling-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const rn = Number(btn.dataset.rn);
+      if (expandedRuling === rn) {
+        expandedRuling = null;
+        expEl.hidden   = true;
+        btn.classList.remove('active');
+      } else {
+        expandedRuling = rn;
+        const ruling   = rulings.find(r => r.ruling_number === rn);
+        expEl.hidden   = false;
+        expEl.innerHTML = `<strong>Ruling ${ruling.ruling_number}: ${ruling.ruling_label}</strong><p>${ruling.text_of_ruling.replace(/\\emph\{([^}]+)\}/g, '<em>$1</em>').replace(/\\texttt\{([^}]+)\}/g, '<code>$1</code>')}</p>`;
+        chipEl.querySelectorAll('.cat-ruling-chip').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      }
+    });
+  });
+}
+
+// ── Collision detection ───────────────────────────────────────────────────
+let collisionTimer = null;
+
+function scheduleCollisionCheck() {
+  clearTimeout(collisionTimer);
+  collisionTimer = setTimeout(runCollisionCheck, 600);
+}
+
+async function runCollisionCheck() {
+  const shelfmark = getAssembled();
+  const { author, year } = getMetaValues();
+  const dom      = getSegEl('domain')?.value || '';
+  const workmark = computeWorkmark(author, year, dom);
+  const el       = document.getElementById('cat-collision-status');
+  if (!shelfmark || !workmark) { el.innerHTML = ''; return; }
+
+  const params = new URLSearchParams({shelfmark, workmark});
+  if (ENTRY_ID) params.set('exclude_id', ENTRY_ID);
+  const resp   = await fetch(`/api/catalogue/check-collision?${params}`);
+  const data   = await resp.json();
+
+  if (data.collision) {
+    el.innerHTML = `<span class="cat-collision-warn">&#9888; Call number <strong>${data.locus_code}</strong> already assigned to <em>${data.title}</em>. Suggested: <strong>${workmark}.b</strong></span>`;
+  } else if (shelfmark && workmark) {
+    el.innerHTML = '<span class="cat-collision-ok">&#10003; No collision.</span>';
+  } else {
+    el.innerHTML = '';
+  }
+}
+
+// ── Volume manager ────────────────────────────────────────────────────────
+let volumes = [];
+
+function renderVolList() {
+  const list       = document.getElementById('cat-vol-list');
+  const toggle     = document.getElementById('cat-multivol-toggle');
+  const showMarks  = volumes.length > 1;
+  // Keep toggle in sync with volume count
+  if (showMarks !== toggle.checked) toggle.checked = showMarks;
+  const markAllBtn = document.getElementById('cat-mark-all-vols');
+  markAllBtn.hidden = !showMarks;
+
+  if (!volumes.length) {
+    list.innerHTML = '<p class="cat-vol-empty text-muted">No volumes added.</p>';
+    return;
+  }
+
+  list.innerHTML = volumes.map((v, i) => `
+    <div class="cat-vol-row" data-idx="${i}">
+      <span class="cat-vol-num">${i + 1}.</span>
+      ${showMarks
+        ? `<input type="text" class="cat-vol-mark" placeholder="v.1 / c.1" value="${v.mark || ''}">`
+        : '<span class="cat-vol-mark-placeholder">(single vol.)</span>'}
+      <input type="text" class="cat-vol-barcode" placeholder="barcode" value="${v.barcode || ''}">
+      <button type="button" class="cat-vol-remove btn btn-danger btn-sm" data-idx="${i}">&times;</button>
+    </div>`
+  ).join('');
+
+  list.querySelectorAll('.cat-vol-mark').forEach(inp => {
+    inp.addEventListener('input', e => {
+      const idx = Number(e.target.closest('.cat-vol-row').dataset.idx);
+      volumes[idx].mark = e.target.value;
+    });
+  });
+  list.querySelectorAll('.cat-vol-barcode').forEach(inp => {
+    inp.addEventListener('input', e => {
+      const idx = Number(e.target.closest('.cat-vol-row').dataset.idx);
+      volumes[idx].barcode = e.target.value;
+    });
+  });
+  list.querySelectorAll('.cat-vol-remove').forEach(btn => {
+    btn.addEventListener('click', e => {
+      const idx = Number(e.target.dataset.idx);
+      volumes.splice(idx, 1);
+      renderVolList();
+    });
+  });
+}
+
+function addVolume() {
+  const bc = nextBarcode !== null ? String(nextBarcode + volumes.length) : '';
+  volumes.push({mark: '', barcode: bc});
+  renderVolList();
+}
+
+document.getElementById('cat-add-vol').addEventListener('click', addVolume);
+document.getElementById('cat-multivol-toggle').addEventListener('change', renderVolList);
+document.getElementById('cat-mark-all-vols').addEventListener('click', () => {
+  volumes.forEach((v, i) => { if (!v.mark) v.mark = `v.${i + 1}`; });
+  renderVolList();
+});
+
+// ── Save ──────────────────────────────────────────────────────────────────
+function bindSave() {
+  document.getElementById('cat-save').addEventListener('click', doSave);
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); doSave(); }
+  });
+}
+
+async function doSave() {
+  const shelfmark = getAssembled();
+  const { author, year, title, publisher } = getMetaValues();
+  const dom      = getSegEl('domain')?.value || '';
+  const workmark = computeWorkmark(author, year, dom);
+  const status   = document.getElementById('cat-save-status');
+
+  if (!shelfmark || !workmark) {
+    status.textContent = 'Complete the shelfmark before saving.';
+    status.className   = 'cat-save-status cat-save-error';
+    return;
+  }
+
+  const payload = {
+    mode:       MODE,
+    entry_id:   ENTRY_ID || null,
+    locus_code: `${shelfmark} / ${workmark}`,
+    author, year, title, publisher,
+    volumes: volumes.map(v => ({id: v.id || null, mark: v.mark, barcode: v.barcode})),
+  };
+
+  status.textContent = 'Saving…';
+  status.className   = 'cat-save-status';
+  try {
+    const resp = await fetch('/api/catalogue/save', {
+      method:  'POST',
+      headers: {'Content-Type': 'application/json'},
+      body:    JSON.stringify(payload),
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || 'Save failed');
+
+    status.textContent = 'Saved.';
+    status.className   = 'cat-save-status cat-save-ok';
+    // Navigate based on mode
+    if (MODE === 'new' || MODE === 'classify') {
+      window.location.href = `/entry/${data.entry_id}`;
+    } else {
+      // batch — server always presents the next unclassified entry
+      window.location.href = '/cataloguing/batch';
+    }
+  } catch (err) {
+    status.textContent = `Error: ${err.message}`;
+    status.className   = 'cat-save-status cat-save-error';
+  }
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────
+init();
+</script>
+{% endblock %}

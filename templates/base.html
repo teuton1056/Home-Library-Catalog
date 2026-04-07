@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Home Library Catalog{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<header>
+  <div class="header-left">
+    <a class="site-title" href="{{ url_for('index', all=1) }}">Home Library Catalog</a>
+    <nav class="header-nav">
+      <a href="{{ url_for('about') }}"
+         class="header-nav-link{% if request.endpoint == 'about' %} active{% endif %}">
+        About
+      </a>
+      <a href="{{ url_for('search') }}"
+         class="header-nav-link{% if request.endpoint == 'search' %} active{% endif %}">
+        Search
+      </a>
+      <a href="{{ url_for('shelf_browse') }}"
+         class="header-nav-link{% if request.endpoint == 'shelf_browse' %} active{% endif %}">
+        Browse
+      </a>
+      {% if current_patron and current_patron.role in ('owner', 'cataloguer', 'regular', 'restricted') %}
+      <a href="{{ url_for('subjects') }}"
+         class="header-nav-link{% if request.endpoint in ('subjects','subject_detail','new_subject','edit_subject','delete_subject') %} active{% endif %}">
+        Subjects
+      </a>
+      {% endif %}
+      {% if current_patron and current_patron.role in ('owner', 'cataloguer') %}
+      <a href="{{ url_for('checkout_desk') }}"
+         class="header-nav-link{% if request.endpoint in ('checkout_desk','checkout_scan','checkout_remove','checkout_clear','checkout_do_checkout','checkout_do_checkin','checkout_do_transfer') %} active{% endif %}">
+        Checkout
+      </a>
+      <a href="{{ url_for('checkouts_overview') }}"
+         class="header-nav-link{% if request.endpoint in ('checkouts_overview','patron_checkout_history') %} active{% endif %}">
+        On Loan
+      </a>
+      <a href="{{ url_for('manage') }}"
+         class="header-nav-link{% if request.endpoint == 'manage' %} active{% endif %}">
+        Manage
+      </a>
+      {% endif %}
+    </nav>
+  </div>
+  <div class="header-right">
+    {% if current_patron %}
+    <span class="header-user">{{ current_patron.name }} is logged in</span>
+    <form method="post" action="{{ url_for('logout') }}" class="header-logout-form">
+      <button type="submit" class="btn btn-secondary btn-sm">Log Out</button>
+    </form>
+    {% else %}
+    <a href="{{ url_for('login') }}" class="btn btn-secondary btn-sm header-login-btn">Log In</a>
+    {% endif %}
+  </div>
+</header>
+
+<div class="layout">
+  <nav class="sidebar">
+    <a class="sidebar-label" href="{{ url_for('index', all=1) }}">Libraries</a>
+    <ul>
+      {% for lib in all_libraries %}
+      <li>
+        <a href="{{ url_for('library', library_id=lib.id) }}"
+           class="{{ 'active' if request.endpoint == 'library' and request.view_args.get('library_id') == lib.id else '' }}">
+          {{ lib.name }}
+        </a>
+      </li>
+      {% else %}
+      <li class="sidebar-empty">No libraries yet.</li>
+      {% endfor %}
+    </ul>
+    <a href="{{ url_for('barcode_search') }}"
+       class="btn btn-secondary btn-sm sidebar-action sidebar-barcode{% if request.endpoint == 'barcode_search' %} active{% endif %}">
+      # Barcode Scan
+    </a>
+  </nav>
+
+  <main>
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <div class="flash-messages">
+          {% for msg in messages %}
+            <div class="flash">{{ msg }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </main>
+</div>
+</body>
+</html>

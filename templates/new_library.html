@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% block title %}New Library — Home Library Catalog{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+  <a href="{{ url_for('index') }}">Libraries</a> &rsaquo; New Library
+</div>
+
+<h1>New Library</h1>
+
+<div class="form-card">
+  <form method="post">
+    <div class="form-group">
+      <label for="name">Library Name</label>
+      <input id="name" name="name" type="text" placeholder="e.g. Home Library"
+             autofocus required>
+    </div>
+    <div class="form-group">
+      <label class="checkbox-label">
+        Primary library
+        <input type="checkbox" name="is_primary" value="1">
+      </label>
+      <span class="field-hint">Opened automatically on the home page. Only one library can be primary.</span>
+    </div>
+    <div class="form-group">
+      <label class="checkbox-label">
+        Storage location
+        <input type="checkbox" name="is_storage" value="1">
+      </label>
+      <span class="field-hint">Volumes here show a storage indicator and support a Box Number field.</span>
+    </div>
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">Create Library</button>
+      <a href="{{ url_for('index', all=1) }}" class="btn btn-secondary">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

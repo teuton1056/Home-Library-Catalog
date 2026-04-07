@@ -1,0 +1,138 @@
+{% extends 'base.html' %}
+{% block title %}Checkout Desk — Home Library Catalog{% endblock %}
+
+{% block content %}
+<h1>Checkout Desk</h1>
+
+<!-- Barcode scan form -->
+<form method="post" action="{{ url_for('checkout_scan') }}" class="checkout-scan-form">
+  <input id="checkout-barcode" name="barcode" type="text"
+         placeholder="Scan or enter barcode…"
+         autocomplete="off" autofocus>
+  <button type="submit" class="btn btn-primary">Add to Bin</button>
+</form>
+
+<!-- Bin -->
+<div class="section-header">
+  <h2>Bin <span class="vol-badge">{{ volumes | length }}</span></h2>
+  {% if volumes %}
+  <form method="post" action="{{ url_for('checkout_clear') }}" style="margin-left:auto">
+    <button type="submit" class="btn btn-secondary btn-sm"
+            onclick="return confirm('Clear the entire bin?')">Clear bin</button>
+  </form>
+  {% endif %}
+</div>
+
+{% if volumes %}
+<table class="vol-table">
+  <thead>
+    <tr>
+      <th>Barcode</th>
+      <th>Title</th>
+      <th>Author</th>
+      <th>Call No.</th>
+      <th>Location</th>
+      <th>Status</th>
+      <th><span class="visually-hidden">Remove</span></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for vol in volumes %}
+    <tr>
+      <td class="vol-id-cell">{{ vol.barcode or '—' }}</td>
+      <td>{{ vol.title or '(Untitled)' }}</td>
+      <td>{{ vol.author or '—' }}</td>
+      <td class="lcc-code">{{ vol.locus_call_number or '—' }}</td>
+      <td>{{ vol.library_name or '—' }}</td>
+      <td>
+        {% if vol.checked_out %}
+          <span class="checked-out-badge">Checked Out</span>
+        {% elif vol.library_is_storage %}
+          <span class="in-storage-badge">In Storage</span>
+        {% else %}
+          <span class="in-library-badge">In Library</span>
+        {% endif %}
+      </td>
+      <td class="vol-actions">
+        <form method="post" action="{{ url_for('checkout_remove', volume_id=vol.id) }}">
+          <button type="submit" class="btn btn-danger btn-sm">Remove</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<!-- Actions -->
+<div class="checkout-actions">
+
+  <!-- Check Out -->
+  <div class="checkout-action-card">
+    <h3>Check Out</h3>
+    <p class="checkout-action-desc">Loan all binned volumes to a patron.</p>
+    <form method="post" action="{{ url_for('checkout_do_checkout') }}" class="checkout-action-form">
+      <div class="form-group">
+        <label for="patron_number">Patron Number</label>
+        <input id="patron_number" name="patron_number" type="text"
+               placeholder="e.g. 0042" autocomplete="off">
+      </div>
+      <button type="submit" class="btn btn-primary">Check Out</button>
+    </form>
+  </div>
+
+  <!-- Check In -->
+  <div class="checkout-action-card">
+    <h3>Check In</h3>
+    <p class="checkout-action-desc">Return all binned volumes.</p>
+    <form method="post" action="{{ url_for('checkout_do_checkin') }}">
+      <button type="submit" class="btn btn-primary">Check In</button>
+    </form>
+  </div>
+
+  <!-- Transfer -->
+  <div class="checkout-action-card">
+    <h3>Transfer</h3>
+    <p class="checkout-action-desc">Move all binned volumes to a different library.</p>
+    <form method="post" action="{{ url_for('checkout_do_transfer') }}" class="checkout-action-form"
+          id="transfer-form">
+      <div class="form-group">
+        <label for="transfer-library">Destination Library</label>
+        <select id="transfer-library" name="library_id">
+          <option value="">— select —</option>
+          {% for lib in libraries %}
+          <option value="{{ lib.id }}">{{ lib.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="form-group" id="transfer-box-group" hidden>
+        <label for="transfer-box">Box Number</label>
+        <input id="transfer-box" name="box_number" type="text" placeholder="e.g. A3">
+      </div>
+      <button type="submit" class="btn btn-primary">Transfer</button>
+    </form>
+  </div>
+
+</div><!-- /.checkout-actions -->
+
+{% else %}
+<p class="empty-state">The bin is empty. Scan a barcode to add a volume.</p>
+{% endif %}
+
+<script>
+// Auto-focus barcode input on page load
+document.getElementById('checkout-barcode').focus();
+
+// Show/hide box number field when storage library selected
+(function () {
+  const storageIds  = new Set({{ storage_lib_ids | tojson }});
+  const libSel      = document.getElementById('transfer-library');
+  const boxGroup    = document.getElementById('transfer-box-group');
+  if (!libSel) return;
+  function sync() {
+    boxGroup.hidden = !storageIds.has(parseInt(libSel.value));
+  }
+  libSel.addEventListener('change', sync);
+  sync();
+})();
+</script>
+{% endblock %}

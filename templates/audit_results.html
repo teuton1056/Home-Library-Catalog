@@ -1,0 +1,105 @@
+{% extends 'base.html' %}
+{% block title %}Audit Results: {{ library.name }} — Home Library Catalog{% endblock %}
+
+{% block content %}
+<div class="breadcrumb no-print">
+  <a href="{{ url_for('manage') }}">Library Management</a> &rsaquo;
+  <a href="{{ url_for('audit') }}">Audit</a> &rsaquo;
+  {{ library.name }}
+</div>
+
+<div class="audit-results-header">
+  <div>
+    <h1>Audit Results: {{ library.name }}</h1>
+    <p class="audit-intro">
+      {{ scanned }} of {{ total }} barcoded
+      {{ 'volume' if total == 1 else 'volumes' }} confirmed present.
+    </p>
+  </div>
+  <div class="page-actions no-print">
+    <button type="button" class="btn btn-secondary" onclick="window.print()">&#128438; Print</button>
+    <form class="hidden-form" method="post" action="{{ url_for('audit_start') }}">
+      <input type="hidden" name="library_id" value="{{ library.id }}">
+      <button type="submit" class="btn btn-primary"
+              title="Reset all flags and start a new audit of this library">
+        Restart Audit
+      </button>
+    </form>
+    <a href="{{ url_for('audit') }}" class="btn btn-secondary">New Audit</a>
+  </div>
+</div>
+
+<!-- Print-only header -->
+<div class="print-only audit-print-header">
+  <strong>{{ library.name }}</strong> — Physical Audit Report<br>
+  {{ scanned }} / {{ total }} barcoded volumes confirmed &bull; Printed {{ now }}
+</div>
+
+{% if not unscanned and not no_barcode %}
+<div class="audit-all-clear">
+  <span class="audit-complete-icon">&#10003;</span>
+  <p>All barcoded volumes are accounted for. No missing items.</p>
+</div>
+{% endif %}
+
+{% if unscanned %}
+<h2>Unscanned Volumes <span class="vol-badge">{{ unscanned | length }}</span></h2>
+<p class="audit-intro no-print">These volumes were not scanned during the audit — they may be missing, misfiled, or checked out.</p>
+<table class="vol-table audit-results-table">
+  <thead>
+    <tr>
+      <th>Shelfmark</th>
+      <th>Barcode</th>
+      <th>Title</th>
+      <th>Author</th>
+      <th>Vol.</th>
+      <th>Year</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for vol in unscanned %}
+    <tr>
+      <td class="lcc-code">{{ vol.locus_call_number or '—' }}</td>
+      <td class="lcc-code">{{ vol.barcode }}</td>
+      <td><a href="{{ url_for('entry_detail', entry_id=vol.entry_id) }}" class="no-print">{{ vol.title or '(Untitled)' }}</a>
+          <span class="print-only">{{ vol.title or '(Untitled)' }}</span></td>
+      <td>{{ vol.author or '—' }}</td>
+      <td>{{ vol.volume_number or '—' }}</td>
+      <td>{{ vol.year or '—' }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+{% if no_barcode %}
+<h2 class="{{ 'mt-section' if unscanned else '' }}">
+  Volumes Without Barcodes <span class="vol-badge">{{ no_barcode | length }}</span>
+</h2>
+<p class="audit-intro no-print">These volumes have no barcode and cannot be scanned — verify manually.</p>
+<table class="vol-table audit-results-table">
+  <thead>
+    <tr>
+      <th>Shelfmark</th>
+      <th>Title</th>
+      <th>Author</th>
+      <th>Vol.</th>
+      <th>Year</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for vol in no_barcode %}
+    <tr>
+      <td class="lcc-code">{{ vol.locus_call_number or '—' }}</td>
+      <td><a href="{{ url_for('entry_detail', entry_id=vol.entry_id) }}" class="no-print">{{ vol.title or '(Untitled)' }}</a>
+          <span class="print-only">{{ vol.title or '(Untitled)' }}</span></td>
+      <td>{{ vol.author or '—' }}</td>
+      <td>{{ vol.volume_number or '—' }}</td>
+      <td>{{ vol.year or '—' }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+{% endblock %}

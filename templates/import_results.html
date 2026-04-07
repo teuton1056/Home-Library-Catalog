@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% block title %}Import Complete — Home Library Catalog{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+  <a href="{{ url_for('index') }}">Libraries</a> &rsaquo; Import Results
+</div>
+
+<h1>Import Complete</h1>
+
+<div class="card import-summary">
+  <table class="meta-table">
+    <tr><th>Entries imported</th><td>{{ added }}</td></tr>
+    <tr><th>Volumes created automatically</th><td>{{ vols_added }}</td></tr>
+    <tr>
+      <th>Highest barcode assigned</th>
+      <td>
+        <strong>{{ highest_barcode }}</strong>
+        <span class="field-hint"> — next manual barcode should be {{ highest_barcode + 1 }}</span>
+      </td>
+    </tr>
+    <tr>
+      <th>Entries needing manual volumes</th>
+      <td>
+        {% if flagged %}
+          <span class="warn-text">{{ flagged | length }}</span>
+        {% else %}
+          0
+        {% endif %}
+      </td>
+    </tr>
+  </table>
+</div>
+
+{% if flagged %}
+<div class="card">
+  <h2>
+    <span class="warn-text">&#9888;</span>
+    Multi-volume entries — manual action required
+  </h2>
+  <p class="import-note">
+    The following entries were imported but have <strong>no volumes yet</strong> because
+    they consist of multiple physical volumes. Click an entry to open it and add volumes
+    individually.
+  </p>
+  <table class="vol-table">
+    <thead>
+      <tr>
+        <th>Title</th>
+        <th>Type</th>
+        <th>Expected vols.</th>
+        <th>Expected vols.</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in flagged %}
+      <tr>
+        <td>
+          <a href="{{ url_for('entry_detail', entry_id=e.entry_id) }}">
+            {{ e.title }}
+          </a>
+        </td>
+        <td>{{ e.type | replace('_', ' ') | title }}</td>
+        <td>{{ e.volumes }}</td>
+        <td>{{ e.volumes }}</td>
+        <td>
+          <a href="{{ url_for('entry_detail', entry_id=e.entry_id) }}"
+             class="btn btn-secondary btn-sm">Open</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<div class="form-actions" style="margin-top:1.5rem">
+  <a href="{{ url_for('index') }}" class="btn btn-primary">Go to Libraries</a>
+</div>
+{% endblock %}

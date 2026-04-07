@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% block title %}Audit — Home Library Catalog{% endblock %}
+
+{% block content %}
+<div class="breadcrumb">
+  <a href="{{ url_for('manage') }}">Library Management</a> &rsaquo; Audit
+</div>
+
+<h1>Physical Audit</h1>
+<p class="audit-intro">
+  Select a library to audit. All volume audit flags will be reset to unscanned,
+  then you can scan barcodes to confirm each physical item is present.
+</p>
+
+{% if libraries %}
+<form method="post" action="{{ url_for('audit_start') }}" class="form-card audit-start-form">
+  <div class="form-group">
+    <label for="audit-library">Library to audit</label>
+    <select id="audit-library" name="library_id" required>
+      <option value="">— select a library —</option>
+      {% for lib in libraries %}
+      <option value="{{ lib.id }}">
+        {{ lib.name }}{% if lib.is_storage %} (Storage){% endif %}{% if lib.is_primary %} (Primary){% endif %}
+      </option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="form-actions">
+    <button type="submit" class="btn btn-primary">Start Audit</button>
+    <a href="{{ url_for('manage') }}" class="btn btn-secondary">Cancel</a>
+  </div>
+</form>
+{% else %}
+<p class="empty-state">No libraries exist yet. <a href="{{ url_for('new_library') }}">Create one first.</a></p>
+{% endif %}
+{% endblock %}

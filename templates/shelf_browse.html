@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+{% block title %}Shelf Browse — Home Library Catalog{% endblock %}
+
+{% block content %}
+<div class="shelf-browse">
+
+<div class="shelf-header">
+  <h1>Shelf Browse</h1>
+  <span class="shelf-count">{{ volumes | length }} volume{{ 's' if volumes | length != 1 else '' }}</span>
+</div>
+
+<nav class="shelf-prefix-bar">
+  <a href="{{ url_for('shelf_browse') }}"
+     class="shelf-prefix-btn{% if not active_prefix %} active{% endif %}">All</a>
+  {% for pfx in prefixes %}
+  <a href="{{ url_for('shelf_browse', prefix=pfx) }}"
+     class="shelf-prefix-btn{% if active_prefix == pfx %} active{% endif %}">{{ pfx }}</a>
+  {% endfor %}
+</nav>
+
+{% if volumes %}
+<table class="shelf-table">
+  <thead>
+    <tr>
+      <th class="col-call">LOCUS Call No.</th>
+      <th class="col-title">Title</th>
+      <th class="col-author">Author / Editor</th>
+      <th class="col-year">Year</th>
+      <th class="col-library">Library</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% set ns = namespace(last_prefix='') %}
+    {% for vol in volumes %}
+      {% set this_prefix = vol.locus_call_number[:2].upper() %}
+      {% if this_prefix != ns.last_prefix %}
+        {% set ns.last_prefix = this_prefix %}
+        <tr class="shelf-group-row">
+          <td colspan="5" class="shelf-group-header">{{ this_prefix }}</td>
+        </tr>
+      {% endif %}
+    <tr>
+      <td class="col-call lcc-code">{{ vol.locus_call_number }}</td>
+      <td class="col-title">
+        <a href="{{ url_for('entry_detail', entry_id=vol.entry_id) }}">{{ vol.title or '(Untitled)' }}</a>
+        {% if vol.volume_number %}
+          <span class="shelf-vol-num">vol. {{ vol.volume_number }}</span>
+        {% endif %}
+      </td>
+      <td class="col-author">{{ vol.author or '—' }}</td>
+      <td class="col-year">{{ vol.year or '—' }}</td>
+      <td class="col-library">{{ vol.library_name or '—' }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty-state">
+  {% if active_prefix %}
+    No volumes with LOCUS prefix <strong>{{ active_prefix }}</strong>.
+  {% else %}
+    No volumes with LOCUS call numbers have been catalogued yet.
+  {% endif %}
+</p>
+{% endif %}
+
+</div>
+{% endblock %}
