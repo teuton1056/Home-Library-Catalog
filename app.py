@@ -348,9 +348,9 @@ def migrate_db():
     if not owner_exists:
         db.execute(
             "INSERT INTO patrons (patron_number, name, role) VALUES (?, ?, 'owner')",
-            ('owner', 'Library Owner')
+            ('0001', 'Library Owner')
         )
-        logger.warning('No owner patron found — created default owner with patron_number "owner".')
+        logger.warning('No owner patron found — created default owner with patron_number "0001".')
 
     logger.debug('Ensuring digital_resources table exists...')
     # Ensure the digital_resources table exists (idempotent)
@@ -482,8 +482,9 @@ def migrate_db():
 
     # If the default owner was created, they won't have a password hash — set it to a known value so they can log in and change it.
     # check if the owner patron has a password_hash; if not, set it to a default value
-    owner_password_hash = db.execute("SELECT password_hash FROM patrons WHERE role = 'owner'").fetchone()
-    if not owner_password_hash:
+    owner_password_hash: sqlite3.Row = db.execute("SELECT password_hash FROM patrons WHERE role = 'owner'").fetchone()
+    if owner_password_hash['password_hash'] == None:
+        logger.warning('Owner patron has no password hash — setting default password to "password". Please log in and change this!')
         hash = generate_password_hash('password')
         db.execute("UPDATE patrons SET password_hash = ? WHERE role = 'owner'", (hash,))
 
