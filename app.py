@@ -108,6 +108,11 @@ def setup_logging() -> logging.Logger:
 
 logger = setup_logging()
 
+if app.secret_key == 'dev-secret-key-change-in-production':
+    logger.critical('Using default secret key — this should be overridden in production for security!')
+
+# Load the LOCUS prefix → rank mapping from the JSON file (used for sorting by LOCUS call number)
+# Isn't there a better way to do this?
 _locus_prefix_order_path = os.path.join(os.path.dirname(__file__), 'LOCUS_Prefix_Order.json')
 with open(_locus_prefix_order_path) as _f:
     LOCUS_PREFIX_RANK: dict[str, int] = json.load(_f)
@@ -248,7 +253,7 @@ _SORT_ORDER_BY = {
 # Database helpers
 # ---------------------------------------------------------------------------
 
-def get_db():
+def get_db() -> sqlite3.Connection:
     db = getattr(g, '_database', None)
     if db is None:
         db = g._database = sqlite3.connect(DATABASE)
@@ -337,6 +342,15 @@ def migrate_db():
         "  CHECK(role IN ('owner', 'cataloguer', 'regular', 'restricted', 'guest'))"
         ')'
     )
+
+    # check that an owner patron exists; if not, create a default one
+    owner_exists = db.execute("SELECT 1 FROM patrons WHERE role = 'owner'").fetchone()
+    if not owner_exists:
+        db.execute(
+            "INSERT INTO patrons (patron_number, name, role) VALUES (?, ?, 'owner')",
+            ('0001', 'Library Owner')
+        )
+        logger.warning('No owner patron found — created default owner with patron_number "0001".')
 
     logger.debug('Ensuring digital_resources table exists...')
     # Ensure the digital_resources table exists (idempotent)
@@ -465,6 +479,14 @@ def migrate_db():
             db.execute(sql)
         except sqlite3.OperationalError:
             pass  # column already exists
+
+    # If the default owner was created, they won't have a password hash — set it to a known value so they can log in and change it.
+    # check if the owner patron has a password_hash; if not, set it to a default value
+    owner_password_hash: sqlite3.Row = db.execute("SELECT password_hash FROM patrons WHERE role = 'owner'").fetchone()
+    if owner_password_hash['password_hash'] == None:
+        logger.warning('Owner patron has no password hash — setting default password to "password". Please log in and change this!')
+        hash = generate_password_hash('password')
+        db.execute("UPDATE patrons SET password_hash = ? WHERE role = 'owner'", (hash,))
 
     # Backfill any NULL restricted values (rows created before the column existed)
     db.execute("UPDATE entries SET restricted = 'unrestricted' WHERE restricted IS NULL")
@@ -656,6 +678,7 @@ def _sync_author_field(db, entry_id):
 
 def _commit(db):
     """Commit and flag that a backup should be made after the request."""
+    logger.debug('Committing database changes...')
     db.commit()
     if has_request_context():
         g._db_modified = True
@@ -794,6 +817,11 @@ def generate_citation(entry, volumes, contributors=None):
     pub_loc   = entry['publisher_location']
     etype     = entry['type']
     year_str  = str(year) if year else 'n.d.'
+
+    if entry['subtitle']:
+        title += f': {entry["subtitle"]}'
+    if entry['edition']:
+        title += f', {entry["edition"]}'
 
     parts = []
 
