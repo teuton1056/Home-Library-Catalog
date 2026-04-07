@@ -480,6 +480,13 @@ def migrate_db():
         except sqlite3.OperationalError:
             pass  # column already exists
 
+    # If the default owner was created, they won't have a password hash — set it to a known value so they can log in and change it.
+    # check if the owner patron has a password_hash; if not, set it to a default value
+    owner_password_hash = db.execute("SELECT password_hash FROM patrons WHERE role = 'owner'").fetchone()
+    if not owner_password_hash:
+        hash = generate_password_hash('password')
+        db.execute("UPDATE patrons SET password_hash = ? WHERE role = 'owner'", (hash,))
+
     # Backfill any NULL restricted values (rows created before the column existed)
     db.execute("UPDATE entries SET restricted = 'unrestricted' WHERE restricted IS NULL")
 
