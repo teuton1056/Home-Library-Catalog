@@ -108,11 +108,14 @@ def setup_logging() -> logging.Logger:
 
 logger = setup_logging()
 
+logger.info('Application starting up...')
+
 if app.secret_key == 'dev-secret-key-change-in-production':
     logger.critical('Using default secret key — this should be overridden in production for security!')
 
 # Load the LOCUS prefix → rank mapping from the JSON file (used for sorting by LOCUS call number)
 # Isn't there a better way to do this?
+logger.debug('Loading LOCUS prefix order from JSON file...')
 _locus_prefix_order_path = os.path.join(os.path.dirname(__file__), 'LOCUS_Prefix_Order.json')
 with open(_locus_prefix_order_path) as _f:
     LOCUS_PREFIX_RANK: dict[str, int] = json.load(_f)
@@ -3083,7 +3086,7 @@ if __name__ == '__main__':
     _port  = _cfg.getint ('server', 'port',  fallback=5000)
     _debug = _cfg.getboolean('server', 'debug', fallback=True)
 
-    logger.info('Starting Home Library Catalog...')
+    logger.info('Starting Home Library Catalog as main...')
     if not os.path.exists(DATABASE):
         logger.info('Database not found — initialising from schema...')
         init_db()
