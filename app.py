@@ -343,6 +343,15 @@ def migrate_db():
         ')'
     )
 
+    # check that an owner patron exists; if not, create a default one
+    owner_exists = db.execute("SELECT 1 FROM patrons WHERE role = 'owner'").fetchone()
+    if not owner_exists:
+        db.execute(
+            "INSERT INTO patrons (patron_number, name, role) VALUES (?, ?, 'owner')",
+            ('owner', 'Library Owner')
+        )
+        logger.warning('No owner patron found — created default owner with patron_number "owner".')
+
     logger.debug('Ensuring digital_resources table exists...')
     # Ensure the digital_resources table exists (idempotent)
     db.execute(
