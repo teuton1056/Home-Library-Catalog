@@ -253,7 +253,7 @@ _SORT_ORDER_BY = {
 # Database helpers
 # ---------------------------------------------------------------------------
 
-def get_db():
+def get_db() -> sqlite3.Connection:
     db = getattr(g, '_database', None)
     if db is None:
         db = g._database = sqlite3.connect(DATABASE)
