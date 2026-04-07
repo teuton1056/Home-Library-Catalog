@@ -801,6 +801,11 @@ def generate_citation(entry, volumes, contributors=None):
     etype     = entry['type']
     year_str  = str(year) if year else 'n.d.'
 
+    if entry['subtitle']:
+        title += f': {entry["subtitle"]}'
+    if entry['edition']:
+        title += f', {entry["edition"]}'
+
     parts = []
 
     # Build author/editor string from structured contributors
