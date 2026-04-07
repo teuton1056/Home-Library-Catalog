@@ -108,6 +108,11 @@ def setup_logging() -> logging.Logger:
 
 logger = setup_logging()
 
+if app.secret_key == 'dev-secret-key-change-in-production':
+    logger.critical('Using default secret key — this should be overridden in production for security!')
+
+# Load the LOCUS prefix → rank mapping from the JSON file (used for sorting by LOCUS call number)
+# Isn't there a better way to do this?
 _locus_prefix_order_path = os.path.join(os.path.dirname(__file__), 'LOCUS_Prefix_Order.json')
 with open(_locus_prefix_order_path) as _f:
     LOCUS_PREFIX_RANK: dict[str, int] = json.load(_f)
