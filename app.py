@@ -46,8 +46,19 @@ DAILY_BACKUP_DIR  = os.path.join(BACKUP_DIR, 'daily')
 SHORT_BACKUP_KEEP = _cfg.getint('backup', 'short_keep', fallback=5)
 DAILY_BACKUP_KEEP = _cfg.getint('backup', 'daily_keep', fallback=30)
 
+# [locale]
+_labels_stem = _cfg.get('locale', 'labels', fallback='default')
+_labels_path = os.path.join(_APP_DIR, 'labels', f'{_labels_stem}.json')
+with open(_labels_path, encoding='utf-8') as _f:
+    _labels: dict = json.load(_f)
 
+@app.context_processor
+def inject_labels():
+    return {'labels': _labels}
 
+# [classification]
+cdir = _cfg_path('classification', 'classification_dir', 'classification_data')
+CLASSIFICATION_DIR = os.path.join(_APP_DIR, cdir)
 
 # ---------------------------------------------------------------------------
 # Logging setup
@@ -116,8 +127,9 @@ if app.secret_key == 'dev-secret-key-change-in-production':
 # Load the LOCUS prefix → rank mapping from the JSON file (used for sorting by LOCUS call number)
 # Isn't there a better way to do this?
 logger.debug('Loading LOCUS prefix order from JSON file...')
-_locus_prefix_order_path = os.path.join(os.path.dirname(__file__), 'LOCUS_Prefix_Order.json')
-with open(_locus_prefix_order_path) as _f:
+prefix_order_file = _cfg.get('classification', 'heading_order_file', fallback='LOCUS_Heading_Order.json')
+prefix_order_path = os.path.join(CLASSIFICATION_DIR, prefix_order_file)
+with open(prefix_order_path) as _f:
     LOCUS_PREFIX_RANK: dict[str, int] = json.load(_f)
 
 _YEAR_RE = re.compile(r'^\d{4}(?:[/\-]\d{4})?$')
@@ -239,8 +251,9 @@ SORT_OPTIONS = [
     ('title',  'Title'),
     ('author', 'Author'),
     ('year',   'Year'),
-    ('locus',  'LOCUS'),
+    ('locus',  _labels['label_classification_code']),
 ]
+
 
 # Maps sort key → SQL ORDER BY clause (entries aliased as e, first_call_number available)
 _SORT_ORDER_BY = {

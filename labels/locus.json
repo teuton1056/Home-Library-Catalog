@@ -1,0 +1,12 @@
+{
+    "classification_schema": "LOCUS",
+    "nav_home": "Home Library Catalogue",
+    "label_classification_code": "LOCUS Code",
+    "label_classification_code_hint": "Bibliographic classification code in the LOCUS system.",
+    "label_call_number": "LOCUS Call No.",
+    "label_call_number_input_placeholder": "LOCUS",
+    "shelf_browse_col_call": "LOCUS Call No.",
+    "about_page_call_number":"LOCUS Call Number",
+    "about_page_classification_code":"LOCUS Code",
+    "about_page_classification_code_lower":"LOCUS code"
+}

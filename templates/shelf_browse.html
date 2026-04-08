@@ -22,7 +22,7 @@
 <table class="shelf-table">
   <thead>
     <tr>
-      <th class="col-call">LOCUS Call No.</th>
+      <th class="col-call">{{ labels.shelf_browse_col_call }}</th>
       <th class="col-title">Title</th>
       <th class="col-author">Author / Editor</th>
       <th class="col-year">Year</th>
@@ -57,9 +57,9 @@
 {% else %}
 <p class="empty-state">
   {% if active_prefix %}
-    No volumes with LOCUS prefix <strong>{{ active_prefix }}</strong>.
+    No volumes with {{ labels.classification_schema }} prefix <strong>{{ active_prefix }}</strong>.
   {% else %}
-    No volumes with LOCUS call numbers have been catalogued yet.
+    No volumes with {{ labels.classification_schema }} call numbers have been catalogued yet.
   {% endif %}
 </p>
 {% endif %}

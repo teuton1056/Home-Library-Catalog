@@ -263,11 +263,11 @@
     </div>
 
     <div class="form-group">
-      <label for="locus_code">LOCUS Code</label>
+      <label for="locus_code">{{ labels.label_classification_code }}</label>
       <input id="locus_code" name="locus_code" type="text"
              placeholder="e.g. CS.A14"
              value="{{ entry.locus_code if editing and entry.locus_code else '' }}">
-      <span class="field-hint">Bibliographic classification code in the LOCUS system.</span>
+      <span class="field-hint">{{ labels.label_classification_code_hint }}</span>
     </div>
 
     <div id="original-group">
