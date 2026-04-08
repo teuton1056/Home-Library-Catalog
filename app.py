@@ -56,7 +56,9 @@ with open(_labels_path, encoding='utf-8') as _f:
 def inject_labels():
     return {'labels': _labels}
 
-
+# [classification]
+cdir = _cfg_path('classification', 'classification_dir', 'classification_data')
+CLASSIFICATION_DIR = os.path.join(_APP_DIR, cdir)
 
 # ---------------------------------------------------------------------------
 # Logging setup
@@ -125,8 +127,9 @@ if app.secret_key == 'dev-secret-key-change-in-production':
 # Load the LOCUS prefix → rank mapping from the JSON file (used for sorting by LOCUS call number)
 # Isn't there a better way to do this?
 logger.debug('Loading LOCUS prefix order from JSON file...')
-_locus_prefix_order_path = os.path.join(os.path.dirname(__file__), 'LOCUS_Prefix_Order.json')
-with open(_locus_prefix_order_path) as _f:
+prefix_order_file = _cfg.get('classification', 'heading_order_file', fallback='LOCUS_Heading_Order.json')
+prefix_order_path = os.path.join(CLASSIFICATION_DIR, prefix_order_file)
+with open(prefix_order_path) as _f:
     LOCUS_PREFIX_RANK: dict[str, int] = json.load(_f)
 
 _YEAR_RE = re.compile(r'^\d{4}(?:[/\-]\d{4})?$')
