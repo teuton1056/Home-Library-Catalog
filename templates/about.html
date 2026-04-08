@@ -30,7 +30,7 @@
   </div>
   <div class="about-stat">
     <span class="about-stat-num">{{ stats.locus_count }}</span>
-    <span class="about-stat-label">LOCUS Catalogued</span>
+    <span class="about-stat-label">Classified</span>
   </div>
   <div class="about-stat">
     <span class="about-stat-num">{{ stats.subject_count }}</span>
@@ -65,7 +65,7 @@
     </p>
     <p>
       Each physical copy is tracked as a <strong>volume</strong>, which records the
-      library it lives in, its LOCUS call number, barcode, volume number
+      library it lives in, its {{ labels.about_page_call_number }}, barcode, volume number
       (for multi-volume works), acquisition date, and condition flags for oversize,
       missing, and fragile items. Volumes can also carry an optional
       <strong>physical description</strong> — dimensions, weight, page count, binding
@@ -99,8 +99,8 @@
     </ul>
     <p>
       All entries also carry Title, Subtitle, Year, Language, Notes, Condition,
-      Acquisition Date, Acquisition Source, Abstract, and a <strong>LOCUS Code</strong>
-      field for the full LOCUS call number assigned during cataloguing. Subject access
+      Acquisition Date, Acquisition Source, Abstract, and a <strong>{{ labels.about_page_classification_code }}</strong>
+      field for the full {{ labels.about_page_call_number }} assigned during cataloguing. Subject access
       points are linked controlled vocabulary headings rather than free-text tags — see
       <em>Subject Headings</em> below.
     </p>
@@ -133,7 +133,7 @@
   <section class="about-section">
     <h2>Subject Headings</h2>
     <p>
-      Subject access is managed through a controlled vocabulary modelled on the LOCUS
+      Subject access is managed through a controlled vocabulary modelled on the {{ labels.classification_schema }}
       subject heading system. Each heading is a distinct record with an optional
       <strong>type</strong> (Region, People, Person, Topic, Event, Language, or Work),
       a <strong>scope note</strong>, and structured relations to other headings:
@@ -182,8 +182,7 @@
     <h2>Search</h2>
     <p>
       Full-text search spans every bibliographic and physical field: title, author,
-      year, language, publisher, subject headings, series, ISBN, ISSN, LOCUS
-      call number, LOCUS code, barcode, volume number, and date. Results can be
+      year, language, publisher, subject headings, series, ISBN, ISSN, {{ labels.about_page_call_number }}, {{ labels.about_page_classification_code_lower }}, barcode, volume number, and date. Results can be
       filtered by collection and entry type. Search results respect the access level
       of the logged-in patron — hidden or restricted entries are filtered automatically.
     </p>
