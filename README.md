@@ -90,6 +90,9 @@ The checkout desk (`/checkout`) provides a full circulation workflow for owner a
 
 The **On Loan** page (`/checkouts`) lists every currently checked-out item with the borrowing patron and checkout time. Each patron's full checkout history is accessible at `/patron/<id>/checkouts`.
 
+### Customization/Locale System
+While the system is designed to be used with the LOCUS system, a range of labels are drawn from label files in `labels/`. The file used is set in the `config.ini` configuration file.
+
 ### Physical Audit
 Audit mode verifies which volumes are physically present in a given library using a barcode scanner or keyboard input. The tool gives immediate colour-coded feedback (found, already scanned, not found) and tracks progress with a live counter. A printer-friendly report at the end lists all volumes that were not scanned.
 
