@@ -209,7 +209,7 @@
   {% endif %}
   {% if entry.locus_code %}
   <tr>
-    <th>LOCUS Code</th>
+    <th>{{ labels.label_classification_code }}</th>
     <td>{{ entry.locus_code }}</td>
   </tr>
   {% endif %}
@@ -309,7 +309,7 @@
     <tr>
       <th>Vol. No.</th>
       <th>Library</th>
-      <th>LOCUS Call No.</th>
+      <th>{{ labels.label_call_number }}</th>
       <th>Barcode</th>
       <th>Date</th>
       {% if has_storage_vols %}<th>Box</th>{% endif %}
@@ -400,7 +400,7 @@
           </select>
         </td>
         <td><input class="vol-input" name="locus_call_number" type="text"
-                   placeholder="LOCUS" value="{{ vol.locus_call_number or '' }}"></td>
+                   placeholder="{{ labels.label_call_number_input_placeholder }}" value="{{ vol.locus_call_number or '' }}"></td>
         <td><input class="vol-input" name="barcode" type="text"
                    value="{{ vol.barcode or '' }}"></td>
         <td><input class="vol-input" name="date" type="text"
@@ -509,7 +509,7 @@
       </select>
     </div>
     <div class="form-group">
-      <label>LOCUS Call No.</label>
+      <label>{{ labels.label_call_number }}</label>
       <input name="locus_call_number" type="text" placeholder="e.g. CS.A14.7">
     </div>
     <div class="form-group">

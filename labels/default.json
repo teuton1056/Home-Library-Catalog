@@ -1,4 +1,9 @@
 {
-    "classification_schema":"",
-    "nav_home":"Home Library Catalogue"
+    "classification_schema": "",
+    "nav_home": "My Home Library Catalogue",
+    "label_classification_code": "Classification Code",
+    "label_classification_code_hint": "Bibliographic classification code.",
+    "label_call_number": "Call No.",
+    "label_call_number_input_placeholder": "",
+    "shelf_browse_col_call": "Call No."
 }

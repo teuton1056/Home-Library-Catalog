@@ -46,6 +46,15 @@ DAILY_BACKUP_DIR  = os.path.join(BACKUP_DIR, 'daily')
 SHORT_BACKUP_KEEP = _cfg.getint('backup', 'short_keep', fallback=5)
 DAILY_BACKUP_KEEP = _cfg.getint('backup', 'daily_keep', fallback=30)
 
+# [locale]
+_labels_stem = _cfg.get('locale', 'labels', fallback='default')
+_labels_path = os.path.join(_APP_DIR, 'labels', f'{_labels_stem}.json')
+with open(_labels_path, encoding='utf-8') as _f:
+    _labels: dict = json.load(_f)
+
+@app.context_processor
+def inject_labels():
+    return {'labels': _labels}
 
 
 
@@ -239,8 +248,9 @@ SORT_OPTIONS = [
     ('title',  'Title'),
     ('author', 'Author'),
     ('year',   'Year'),
-    ('locus',  'LOCUS'),
+    ('locus',  _labels['label_classification_code']),
 ]
+
 
 # Maps sort key → SQL ORDER BY clause (entries aliased as e, first_call_number available)
 _SORT_ORDER_BY = {
